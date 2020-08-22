@@ -1,4 +1,4 @@
-use std::ops::{Add, Sub};
+use std::ops::{Add, Div, Mul, Neg, Sub};
 
 const EPSILON: f64 = 0.00001;
 
@@ -25,6 +25,36 @@ impl Tuple {
 
     fn is_vector(&self) -> bool {
         self.w == 0.0
+    }
+
+    /// Distance represented by a vector (called magnitude or length)
+    /// It's how far you would travel in a straight line if you were to walk
+    /// from one end of the vector to another.
+    fn magnitude(&self) -> f64 {
+        (self.x * self.x + self.y * self.y + self.z * self.z + self.w * self.w).sqrt()
+    }
+
+    fn normalize(self) -> Self {
+        let magnitude = self.magnitude();
+        Self {
+            x: self.x / magnitude,
+            y: self.y / magnitude,
+            z: self.z / magnitude,
+            w: self.w / magnitude,
+        }
+    }
+
+    /// Dot product (or scalar product or inner product)
+    /// Takes two vectors and returns a scalar value.
+    /// Used when intersecting rays with objects.
+    /// The smaller the dot product, the larger the angle between the vectors.
+    /// A dot product of 1 means vectors are identical.
+    /// -1 means they point in opposite directions.
+    /// If two vectors are unit vectors, the dot product is the cosine of the
+    /// angle between them.
+    /// For more info: http://betterexplained.com/articles/vector-calculus-understanding-the-dot-product
+    fn dot(&self, other: &Tuple) -> f64 {
+        self.x * other.x + self.y * other.y + self.z * other.z + self.w * other.w
     }
 }
 
@@ -73,6 +103,73 @@ impl Sub for Tuple {
             y: self.y - other.y,
             z: self.z - other.z,
             w: self.w - other.w,
+        }
+    }
+}
+
+impl Neg for Tuple {
+    type Output = Tuple;
+
+    fn neg(self) -> Self {
+        Self {
+            x: -self.x,
+            y: -self.y,
+            z: -self.z,
+            w: -self.w,
+        }
+    }
+}
+
+/// Scalar multiplication - what point lies X times farther in the direction of the vector?
+/// In t * 3.5, the 3.5 here is a scalar value because multiplying by it scales the vector
+/// (changes its length uniformly).
+impl Mul<f64> for Tuple {
+    type Output = Self;
+
+    fn mul(self, rhs: f64) -> Self {
+        Self {
+            x: self.x * rhs,
+            y: self.y * rhs,
+            z: self.z * rhs,
+            w: self.w * rhs,
+        }
+    }
+}
+
+/// Cross product
+/// TODO: Consider making Vector its own type since certain methods are only value on vectors.
+/// Note: Four diensional cross product is significantly more complicated than this three diemnsional version.
+///
+/// If the order of the operands are changed, the direction of the resulting vector changes.
+/// Returns a new vector that is perpendicular to both the original vectors.
+///
+/// X-axis cross Y-axis is Z axis, but Y-axis cross X-axis is -Z axis.
+///
+/// Cross products are primarily used when working with view transformations.
+impl<'a, 'b> Mul<&'b Tuple> for &'a Tuple {
+    type Output = Tuple;
+
+    fn mul(self, rhs: &'b Tuple) -> Tuple {
+        let a = self;
+        let b = rhs;
+        Tuple {
+            x: a.y * b.z - a.z * b.y,
+            y: a.z * b.x - a.x * b.z,
+            z: a.x * b.y - a.y * b.x,
+            w: a.w,
+        }
+    }
+}
+
+impl Div<f64> for Tuple {
+    type Output = Self;
+
+    fn div(self, rhs: f64) -> Self::Output {
+        Self {
+            x: self.x / rhs,
+            y: self.y / rhs,
+            z: self.z / rhs,
+            w: self.w / rhs,
         }
     }
 }
@@ -133,4 +230,86 @@ fn tuple_subtraction() {
     let p1 = Tuple::point(3.0, 2.0, 1.0);
     let p2 = Tuple::point(5.0, 6.0, 7.0);
     assert_eq!(p1 - p2, Tuple::vector(-2.0, -4.0, -6.0));
+
+    let p = Tuple::point(3.0, 2.0, 1.0);
+    let v = Tuple::vector(5.0, 6.0, 7.0);
+    assert_eq!(p - v, Tuple::point(-2.0, -4.0, -6.0));
+
+    let v1 = Tuple::vector(3.0, 2.0, 1.0);
+    let v2 = Tuple::vector(5.0, 6.0, 7.0);
+    assert_eq!(v1 - v2, Tuple::vector(-2.0, -4.0, -6.0));
+
+    let p = Tuple::point(3.0, 2.0, 1.0);
+    let v = Tuple::vector(5.0, 6.0, 7.0);
+    let invalid = v - p;
+    assert_eq!(false, invalid.is_point());
+    assert_eq!(false, invalid.is_vector());
+}
+
+#[test]
+fn tuple_negation() {
+    let zero = Tuple::vector(0.0, 0.0, 0.0);
+    let v = Tuple::vector(1.0, -2.0, 3.0);
+    assert_eq!(zero - v, Tuple::vector(-1.0, 2.0, -3.0));
+
+    let a: Tuple = (1.0, -2.0, 3.0, -4.0).into();
+    assert_eq!(-a, (-1.0, 2.0, -3.0, 4.0).into())
+}
+
+#[test]
+fn tuple_multiplication() {
+    let a: Tuple = (1.0, -2.0, 3.0, -4.0).into();
+    assert_eq!(a * 3.5, (3.5, -7.0, 10.5, -14.0).into());
+
+    let a: Tuple = (1.0, -2.0, 3.0, -4.0).into();
+    assert_eq!(a * 0.5, (0.5, -1.0, 1.5, -2.0).into());
+}
+
+#[test]
+fn tuple_division() {
+    let a: Tuple = (1.0, -2.0, 3.0, -4.0).into();
+    assert_eq!(a / 2.0, (0.5, -1.0, 1.5, -2.0).into());
+}
+
+#[test]
+fn vector_magnitude() {
+    let v = Tuple::vector(1.0, 0.0, 0.0);
+    assert_eq!(v.magnitude(), 1.0);
+
+    let v = Tuple::vector(0.0, 1.0, 0.0);
+    assert_eq!(v.magnitude(), 1.0);
+
+    let v = Tuple::vector(0.0, 0.0, 1.0);
+    assert_eq!(v.magnitude(), 1.0);
+
+    let v = Tuple::vector(1.0, 2.0, 3.0);
+    assert_eq!(v.magnitude(), (14.0_f64).sqrt());
+
+    let v = Tuple::vector(-1.0, -2.0, -3.0);
+    assert_eq!(v.magnitude(), (14.0_f64).sqrt());
+}
+
+#[test]
+fn vector_normalization() {
+    let v = Tuple::vector(4.0, 0.0, 0.0);
+    assert_eq!(v.normalize(), Tuple::vector(1.0, 0.0, 0.0));
+
+    let v = Tuple::vector(1.0, 2.0, 3.0);
+    // 1/14.sqrt, 2/14.sqrt, 3/14.sqrt
+    assert_eq!(v.normalize(), Tuple::vector(0.26726, 0.53452, 0.80178));
+}
+
+#[test]
+fn vector_dot_product() {
+    let a = Tuple::vector(1.0, 2.0, 3.0);
+    let b = Tuple::vector(2.0, 3.0, 4.0);
+    assert_eq!(a.dot(&b), 20.0);
+}
+
+#[test]
+fn vector_cross_product() {
+    let a = &Tuple::vector(1.0, 2.0, 3.0);
+    let b = &Tuple::vector(2.0, 3.0, 4.0);
+    assert_eq!(a * b, Tuple::vector(-1.0, 2.0, -1.0));
+    assert_eq!(b * a, Tuple::vector(1.0, -2.0, 1.0));
 }
