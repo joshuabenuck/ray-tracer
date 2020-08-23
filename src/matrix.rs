@@ -2,11 +2,39 @@ use crate::Tuple;
 use std::ops::{Index, Mul};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub struct Matrix([[f64; 4]; 4]);
+pub struct Matrix2x2([[f64; 2]; 2]);
 
-impl Matrix {
-    fn identity() -> Matrix {
-        Matrix([
+impl Matrix2x2 {
+    fn determinant(&self) -> f64 {
+        self.0[0][0] * self.0[1][1] - self.0[0][1] * self.0[1][0]
+    }
+}
+
+impl Index<usize> for Matrix2x2 {
+    type Output = [f64; 2];
+
+    fn index(&self, idx: usize) -> &Self::Output {
+        &self.0[idx]
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct Matrix3x3([[f64; 3]; 3]);
+
+impl Index<usize> for Matrix3x3 {
+    type Output = [f64; 3];
+
+    fn index(&self, idx: usize) -> &Self::Output {
+        &self.0[idx]
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct Matrix4x4([[f64; 4]; 4]);
+
+impl Matrix4x4 {
+    fn identity() -> Matrix4x4 {
+        Matrix4x4([
             [1.0, 0.0, 0.0, 0.0],
             [0.0, 1.0, 0.0, 0.0],
             [0.0, 0.0, 1.0, 0.0],
@@ -15,7 +43,7 @@ impl Matrix {
     }
 
     /// Used when translating normal vectors between object space and world space
-    fn transpose(&self) -> Matrix {
+    fn transpose(&self) -> Matrix4x4 {
         let a = self.0;
         let mut ta = [[0.0; 4]; 4];
         for row in 0..4 {
@@ -23,11 +51,11 @@ impl Matrix {
                 ta[row][col] = a[col][row];
             }
         }
-        Matrix(ta)
+        Matrix4x4(ta)
     }
 }
 
-impl Index<usize> for Matrix {
+impl Index<usize> for Matrix4x4 {
     type Output = [f64; 4];
 
     fn index(&self, idx: usize) -> &Self::Output {
@@ -36,7 +64,7 @@ impl Index<usize> for Matrix {
 }
 
 // Matrix multiplication computes the dot product of every row-column combination
-impl Mul for Matrix {
+impl Mul for Matrix4x4 {
     type Output = Self;
     fn mul(self, rhs: Self) -> Self {
         let a = self.0;
@@ -49,11 +77,11 @@ impl Mul for Matrix {
                     a[r][0] * b[0][c] + a[r][1] * b[1][c] + a[r][2] * b[2][c] + a[r][3] * b[3][c];
             }
         }
-        Matrix(m)
+        Matrix4x4(m)
     }
 }
 
-impl Mul<Tuple> for Matrix {
+impl Mul<Tuple> for Matrix4x4 {
     type Output = Tuple;
 
     fn mul(self, rhs: Tuple) -> Tuple {
@@ -74,7 +102,7 @@ mod tests {
 
     #[test]
     fn matrix_create() {
-        let m = Matrix([
+        let m = Matrix4x4([
             [1.0, 2.0, 3.0, 4.0],
             [5.5, 6.5, 7.5, 8.5],
             [9.0, 10.0, 11.0, 12.0],
@@ -88,13 +116,13 @@ mod tests {
         assert_eq!(m[3][0], 13.5);
         assert_eq!(m[3][2], 15.5);
 
-        let m = [[-3.0, 5.0], [1.0, -2.0]];
+        let m = Matrix2x2([[-3.0, 5.0], [1.0, -2.0]]);
         assert_eq!(m[0][0], -3.0);
         assert_eq!(m[0][1], 5.0);
         assert_eq!(m[1][0], 1.0);
         assert_eq!(m[1][1], -2.0);
 
-        let m = [[-3.0, 5.0, 0.0], [1.0, -2.0, -7.0], [0.0, 1.0, 1.0]];
+        let m = Matrix3x3([[-3.0, 5.0, 0.0], [1.0, -2.0, -7.0], [0.0, 1.0, 1.0]]);
         assert_eq!(m[0][0], -3.0);
         assert_eq!(m[1][1], -2.0);
         assert_eq!(m[2][2], 1.0);
@@ -102,43 +130,43 @@ mod tests {
 
     #[test]
     fn matrix_compare() {
-        let a = [
+        let a = Matrix4x4([
             [1.0, 2.0, 3.0, 4.0],
             [5.0, 6.0, 7.0, 8.0],
             [9.0, 8.0, 7.0, 6.0],
             [5.0, 4.0, 3.0, 2.0],
-        ];
-        let b = [
+        ]);
+        let b = Matrix4x4([
             [1.0, 2.0, 3.0, 4.0],
             [5.0, 6.0, 7.0, 8.0],
             [9.0, 8.0, 7.0, 6.0],
             [5.0, 4.0, 3.0, 2.0],
-        ];
+        ]);
         assert_eq!(a, b);
-        let b = [
+        let b = Matrix4x4([
             [2.0, 3.0, 4.0, 5.0],
             [6.0, 7.0, 8.0, 9.0],
             [8.0, 7.0, 6.0, 5.0],
             [4.0, 3.0, 2.0, 1.0],
-        ];
+        ]);
         assert_ne!(a, b);
     }
 
     #[test]
     fn matrix_multiply() {
-        let a = Matrix([
+        let a = Matrix4x4([
             [1.0, 2.0, 3.0, 4.0],
             [5.0, 6.0, 7.0, 8.0],
             [9.0, 8.0, 7.0, 6.0],
             [5.0, 4.0, 3.0, 2.0],
         ]);
-        let b = Matrix([
+        let b = Matrix4x4([
             [-2.0, 1.0, 2.0, 3.0],
             [3.0, 2.0, 1.0, -1.0],
             [4.0, 3.0, 6.0, 5.0],
             [1.0, 2.0, 7.0, 8.0],
         ]);
-        let ab = Matrix([
+        let ab = Matrix4x4([
             [20.0, 22.0, 50.0, 48.0],
             [44.0, 54.0, 114.0, 108.0],
             [40.0, 58.0, 110.0, 102.0],
@@ -146,7 +174,7 @@ mod tests {
         ]);
         assert_eq!(a * b, ab);
 
-        let a = Matrix([
+        let a = Matrix4x4([
             [1.0, 2.0, 3.0, 4.0],
             [2.0, 4.0, 4.0, 2.0],
             [8.0, 6.0, 4.0, 1.0],
@@ -158,42 +186,40 @@ mod tests {
 
     #[test]
     fn matrix_identity() {
-        let a = Matrix([
+        let a = Matrix4x4([
             [0.0, 1.0, 2.0, 4.0],
             [1.0, 2.0, 4.0, 8.0],
             [2.0, 4.0, 8.0, 16.0],
             [4.0, 8.0, 16.0, 32.0],
         ]);
 
-        assert_eq!(a * Matrix::identity(), a);
+        assert_eq!(a * Matrix4x4::identity(), a);
 
         let a: Tuple = (1.0, 2.0, 3.0, 4.0).into();
-        assert_eq!(Matrix::identity() * a, a);
+        assert_eq!(Matrix4x4::identity() * a, a);
     }
 
     #[test]
     fn matrix_transpose() {
-        let a = Matrix([
+        let a = Matrix4x4([
             [0.0, 9.0, 3.0, 0.0],
             [9.0, 8.0, 0.0, 8.0],
             [1.0, 8.0, 5.0, 3.0],
             [0.0, 0.0, 5.0, 8.0],
         ]);
-        let ta = Matrix([
+        let ta = Matrix4x4([
             [0.0, 9.0, 1.0, 0.0],
             [9.0, 8.0, 8.0, 0.0],
             [3.0, 0.0, 5.0, 5.0],
             [0.0, 8.0, 3.0, 8.0],
         ]);
         assert_eq!(a.transpose(), ta);
-        assert_eq!(Matrix::identity().transpose(), Matrix::identity());
+        assert_eq!(Matrix4x4::identity().transpose(), Matrix4x4::identity());
     }
 
     #[test]
     fn matrix_determinant() {
-        let a = [[1.0, 5.0], [-3.0, 2.0]];
-        // Not sure this will be needed elsewhere.
-        let determinant = a[0][0] * a[1][1] - a[0][1] * a[1][0];
-        assert_eq!(determinant, 17.0);
+        let a = Matrix2x2([[1.0, 5.0], [-3.0, 2.0]]);
+        assert_eq!(a.determinant(), 17.0);
     }
 }
