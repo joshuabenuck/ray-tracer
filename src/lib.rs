@@ -1,3 +1,3 @@
 mod tuple;
 
-pub use tuple::Tuple;
+pub use tuple::{Canvas, Color, Tuple};

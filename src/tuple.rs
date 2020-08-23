@@ -147,10 +147,10 @@ impl Mul<f64> for Tuple {
 /// X-axis cross Y-axis is Z axis, but Y-axis cross X-axis is -Z axis.
 ///
 /// Cross products are primarily used when working with view transformations.
-impl<'a, 'b> Mul<&'b Tuple> for &'a Tuple {
-    type Output = Tuple;
+impl Mul for Tuple {
+    type Output = Self;
 
-    fn mul(self, rhs: &'b Tuple) -> Tuple {
+    fn mul(self, rhs: Self) -> Self {
         let a = self;
         let b = rhs;
         Tuple {
@@ -176,7 +176,7 @@ impl Div<f64> for Tuple {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct Color {
+pub struct Color {
     red: f64,
     green: f64,
     blue: f64,
@@ -261,14 +261,14 @@ impl Mul for Color {
     }
 }
 
-struct Canvas {
+pub struct Canvas {
     width: usize,
     height: usize,
     pixels: Vec<Color>,
 }
 
 impl Canvas {
-    fn new(width: usize, height: usize) -> Canvas {
+    pub fn new(width: usize, height: usize) -> Canvas {
         let black = Color::new(0.0, 0.0, 0.0);
         Canvas {
             width,
@@ -281,27 +281,45 @@ impl Canvas {
         x + y * self.width
     }
 
-    fn write_pixel(&mut self, x: usize, y: usize, color: Color) {
+    pub fn write_pixel(&mut self, x: usize, y: usize, color: Color) {
+        // TODO: Test
+        if x >= self.width || y >= self.height {
+            return;
+        }
         let idx = self.xy(x, y);
         self.pixels[idx] = color;
     }
 
-    fn pixel_at(&self, x: usize, y: usize) -> Color {
+    pub fn pixel_at(&self, x: usize, y: usize) -> Color {
         let idx = self.xy(x, y);
         self.pixels[idx]
     }
 
-    fn to_ppm(&self) -> String {
+    pub fn to_ppm(&self) -> String {
         let mut ppm = format!("P3\n{} {}\n255\n", self.width, self.height);
         let width = self.width;
         for row in self.pixels.chunks(width) {
-            ppm += row
-                .iter()
-                .map(|c| Into::<(usize, usize, usize)>::into(*c))
-                .map(|c| format!("{} {} {}", c.0, c.1, c.2))
-                .collect::<Vec<String>>()
-                .join(" ")
-                .as_str();
+            let mut i = 0;
+            for pixel in row.iter() {
+                let (red, green, blue) = Into::<(usize, usize, usize)>::into(*pixel);
+                let mut append = |number: usize| {
+                    let text = number.to_string();
+                    let len = text.len();
+                    if i == 0 {
+                    } else if len + i + 1 > 70 {
+                        ppm += "\n";
+                        i = 0;
+                    } else {
+                        ppm += " ";
+                        i += 1;
+                    }
+                    ppm += &text;
+                    i += len;
+                };
+                append(red);
+                append(green);
+                append(blue);
+            }
             ppm += "\n";
         }
         ppm
@@ -438,8 +456,8 @@ fn vector_dot_product() {
 
 #[test]
 fn vector_cross_product() {
-    let a = &Tuple::vector(1.0, 2.0, 3.0);
-    let b = &Tuple::vector(2.0, 3.0, 4.0);
+    let a = Tuple::vector(1.0, 2.0, 3.0);
+    let b = Tuple::vector(2.0, 3.0, 4.0);
     assert_eq!(a * b, Tuple::vector(-1.0, 2.0, -1.0));
     assert_eq!(b * a, Tuple::vector(1.0, -2.0, 1.0));
 }
@@ -520,4 +538,8 @@ fn canvs_to_ppm() {
         ppm.split("\n").skip(3).take(4).collect::<Vec<&str>>(),
         four_to_seven
     );
+
+    let c = Canvas::new(5, 3);
+    let ppm = c.to_ppm();
+    assert_eq!(ppm.as_bytes()[ppm.len() - 1], '\n' as u8);
 }
