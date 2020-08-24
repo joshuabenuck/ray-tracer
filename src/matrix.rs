@@ -1,5 +1,5 @@
 use crate::Tuple;
-use std::ops::{Index, Mul};
+use std::ops::{Index, IndexMut, Mul};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Matrix2x2([[f64; 2]; 2]);
@@ -204,6 +204,12 @@ impl Index<usize> for Matrix4x4 {
 
     fn index(&self, idx: usize) -> &Self::Output {
         &self.0[idx]
+    }
+}
+
+impl IndexMut<usize> for Matrix4x4 {
+    fn index_mut(&mut self, idx: usize) -> &mut Self::Output {
+        &mut self.0[idx]
     }
 }
 
@@ -512,5 +518,36 @@ mod tests {
         ]);
         let c = a * b;
         assert_eq!(c * b.inverse().unwrap(), a);
+    }
+
+    #[test]
+    fn matrix_putting_it_all_together() {
+        // What happens when you invert the identity matrix?
+        assert_eq!(
+            Matrix4x4::identity().inverse().unwrap(),
+            Matrix4x4::identity()
+        );
+        // What doyou get when you multiply a matrix by its inverse?
+        let a = Matrix4x4([
+            [3.0, -9.0, 7.0, -3.0],
+            [3.0, -8.0, 2.0, -9.0],
+            [-4.0, 4.0, 4.0, 1.0],
+            [-6.0, 5.0, -1.0, 1.0],
+        ]);
+        assert_eq!(a * a.inverse().unwrap(), Matrix4x4::identity());
+        // Is there any diff between the inverse of the transpose of a matrix
+        // and the transpose of the inverse?
+        assert_eq!(
+            a.transpose().inverse().unwrap(),
+            a.inverse().unwrap().transpose()
+        );
+        // Multiplying the identity matrix by a tuple yields the tuple
+        let t: Tuple = (5.0, 2.0, 3.0, 4.0).into();
+        assert_eq!(Matrix4x4::identity() * t, t);
+        // What does multiplying a modified identity matrix by a tuple yield
+        // when only one element has been changed?
+        let mut id_modified = Matrix4x4::identity();
+        id_modified[0][0] = 2.0;
+        assert_eq!(id_modified * t, (10.0, 2.0, 3.0, 4.0).into());
     }
 }
