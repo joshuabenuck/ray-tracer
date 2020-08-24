@@ -1,12 +1,11 @@
 use crate::Tuple;
-use std::f64::consts::PI;
 use std::ops::{Index, IndexMut, Mul};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Matrix2x2([[f64; 2]; 2]);
 
 impl Matrix2x2 {
-    fn determinant(&self) -> f64 {
+    pub fn determinant(&self) -> f64 {
         self.0[0][0] * self.0[1][1] - self.0[0][1] * self.0[1][0]
     }
 }
@@ -23,7 +22,7 @@ impl Index<usize> for Matrix2x2 {
 pub struct Matrix3x3([[f64; 3]; 3]);
 
 impl Matrix3x3 {
-    fn submatrix(&self, row: usize, column: usize) -> Matrix2x2 {
+    pub fn submatrix(&self, row: usize, column: usize) -> Matrix2x2 {
         let mut sub = [[0.0; 2]; 2];
         let mut sr = 0;
         for r in 0..3 {
@@ -44,12 +43,12 @@ impl Matrix3x3 {
     }
 
     // determinant of the submatrix
-    fn minor(&self, row: usize, column: usize) -> f64 {
+    pub fn minor(&self, row: usize, column: usize) -> f64 {
         let sub = self.submatrix(row, column);
         sub.determinant()
     }
 
-    fn cofactor(&self, row: usize, column: usize) -> f64 {
+    pub fn cofactor(&self, row: usize, column: usize) -> f64 {
         /*
         sign swapped as follows
         [+ - +]
@@ -61,7 +60,7 @@ impl Matrix3x3 {
         self.minor(row, column) * sign
     }
 
-    fn determinant(&self) -> f64 {
+    pub fn determinant(&self) -> f64 {
         let mut determinant = 0.0;
         let mut c = 0;
         for col in &self.0[0] {
@@ -84,7 +83,7 @@ impl Index<usize> for Matrix3x3 {
 pub struct Matrix4x4([[f64; 4]; 4]);
 
 impl Matrix4x4 {
-    fn identity() -> Matrix4x4 {
+    pub fn identity() -> Matrix4x4 {
         Matrix4x4([
             [1.0, 0.0, 0.0, 0.0],
             [0.0, 1.0, 0.0, 0.0],
@@ -93,7 +92,7 @@ impl Matrix4x4 {
         ])
     }
 
-    fn translation(x: f64, y: f64, z: f64) -> Matrix4x4 {
+    pub fn translation(x: f64, y: f64, z: f64) -> Matrix4x4 {
         let mut translation = Self::identity();
         translation[0][3] = x;
         translation[1][3] = y;
@@ -101,7 +100,7 @@ impl Matrix4x4 {
         translation
     }
 
-    fn scaling(x: f64, y: f64, z: f64) -> Matrix4x4 {
+    pub fn scaling(x: f64, y: f64, z: f64) -> Matrix4x4 {
         let mut scaling = Self::identity();
         scaling[0][0] = x;
         scaling[1][1] = y;
@@ -109,7 +108,7 @@ impl Matrix4x4 {
         scaling
     }
 
-    fn rotation_x(radians: f64) -> Matrix4x4 {
+    pub fn rotation_x(radians: f64) -> Matrix4x4 {
         let mut rotation_x = Matrix4x4::identity();
         rotation_x[1][1] = radians.cos();
         rotation_x[1][2] = -radians.sin();
@@ -118,7 +117,7 @@ impl Matrix4x4 {
         rotation_x
     }
 
-    fn rotation_y(radians: f64) -> Matrix4x4 {
+    pub fn rotation_y(radians: f64) -> Matrix4x4 {
         let mut rotation_y = Matrix4x4::identity();
         rotation_y[0][0] = radians.cos();
         rotation_y[0][2] = radians.sin();
@@ -127,7 +126,7 @@ impl Matrix4x4 {
         rotation_y
     }
 
-    fn rotation_z(radians: f64) -> Matrix4x4 {
+    pub fn rotation_z(radians: f64) -> Matrix4x4 {
         let mut rotation_z = Matrix4x4::identity();
         rotation_z[0][0] = radians.cos();
         rotation_z[0][1] = -radians.sin();
@@ -136,7 +135,7 @@ impl Matrix4x4 {
         rotation_z
     }
 
-    fn shearing(xy: f64, xz: f64, yx: f64, yz: f64, zx: f64, zy: f64) -> Matrix4x4 {
+    pub fn shearing(xy: f64, xz: f64, yx: f64, yz: f64, zx: f64, zy: f64) -> Matrix4x4 {
         let mut shearing = Matrix4x4::identity();
         shearing[0][1] = xy;
         shearing[0][2] = xz;
@@ -147,28 +146,28 @@ impl Matrix4x4 {
         shearing
     }
 
-    fn rotate_x(self, radians: f64) -> Matrix4x4 {
+    pub fn rotate_x(self, radians: f64) -> Matrix4x4 {
         Matrix4x4::rotation_x(radians) * self
     }
 
-    fn rotate_y(self, radians: f64) -> Matrix4x4 {
+    pub fn rotate_y(self, radians: f64) -> Matrix4x4 {
         Matrix4x4::rotation_y(radians) * self
     }
 
-    fn rotate_z(self, radians: f64) -> Matrix4x4 {
+    pub fn rotate_z(self, radians: f64) -> Matrix4x4 {
         Matrix4x4::rotation_z(radians) * self
     }
 
-    fn scale(self, x: f64, y: f64, z: f64) -> Matrix4x4 {
+    pub fn scale(self, x: f64, y: f64, z: f64) -> Matrix4x4 {
         Matrix4x4::scaling(x, y, z) * self
     }
 
-    fn translate(self, x: f64, y: f64, z: f64) -> Matrix4x4 {
+    pub fn translate(self, x: f64, y: f64, z: f64) -> Matrix4x4 {
         Matrix4x4::translation(x, y, z) * self
     }
 
     /// Used when translating normal vectors between object space and world space
-    fn transpose(&self) -> Matrix4x4 {
+    pub fn transpose(&self) -> Matrix4x4 {
         let a = self.0;
         let mut ta = [[0.0; 4]; 4];
         for row in 0..4 {
@@ -179,7 +178,7 @@ impl Matrix4x4 {
         Matrix4x4(ta)
     }
 
-    fn submatrix(&self, row: usize, column: usize) -> Matrix3x3 {
+    pub fn submatrix(&self, row: usize, column: usize) -> Matrix3x3 {
         let mut sub = [[0.0; 3]; 3];
         let mut sr = 0;
         for r in 0..4 {
@@ -199,7 +198,7 @@ impl Matrix4x4 {
         Matrix3x3(sub)
     }
 
-    fn cofactor(&self, row: usize, column: usize) -> f64 {
+    pub fn cofactor(&self, row: usize, column: usize) -> f64 {
         /*
         sign swapped as follows
         [+ - +]
@@ -211,7 +210,7 @@ impl Matrix4x4 {
         self.minor(row, column) * sign
     }
 
-    fn determinant(&self) -> f64 {
+    pub fn determinant(&self) -> f64 {
         let mut determinant = 0.0;
         let mut c = 0;
         for col in &self.0[0] {
@@ -221,11 +220,11 @@ impl Matrix4x4 {
         determinant
     }
 
-    fn is_invertiable(&self) -> bool {
+    pub fn is_invertiable(&self) -> bool {
         self.determinant() != 0.0
     }
 
-    fn inverse(&self) -> Option<Matrix4x4> {
+    pub fn inverse(&self) -> Option<Matrix4x4> {
         let determinant = self.determinant();
         if determinant == 0.0 {
             return None;
@@ -247,7 +246,7 @@ impl Matrix4x4 {
     }
 
     // determinant of the submatrix
-    fn minor(&self, row: usize, column: usize) -> f64 {
+    pub fn minor(&self, row: usize, column: usize) -> f64 {
         let sub = self.submatrix(row, column);
         sub.determinant()
     }
@@ -324,6 +323,7 @@ impl Mul<Tuple> for Matrix4x4 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::f64::consts::PI;
 
     #[test]
     fn matrix_create() {
