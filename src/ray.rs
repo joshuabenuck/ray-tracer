@@ -24,18 +24,18 @@ impl Ray {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
-struct Sphere {
+pub struct Sphere {
     transform: Matrix4x4,
 }
 
 impl Sphere {
-    fn new(transform: Option<Matrix4x4>) -> Sphere {
+    pub fn new(transform: Option<Matrix4x4>) -> Sphere {
         Sphere {
             transform: transform.unwrap_or(Matrix4x4::identity()),
         }
     }
 
-    fn intersects(&self, ray: &Ray) -> Vec<Intersection> {
+    pub fn intersects(&self, ray: &Ray) -> Vec<Intersection> {
         let ray = ray.transform(self.transform.inverse().unwrap());
         let sphere_to_ray = ray.origin - Tuple::point(0.0, 0.0, 0.0);
 
@@ -59,18 +59,18 @@ impl Sphere {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
-struct Intersection {
+pub struct Intersection {
     t: f64,
     object: Sphere,
 }
 
 impl Intersection {
-    fn new(t: f64, object: Sphere) -> Intersection {
+    pub fn new(t: f64, object: Sphere) -> Intersection {
         Intersection { t, object }
     }
 }
 
-trait Intersections {
+pub trait Intersections {
     fn hit(&self) -> Option<&Intersection>;
 }
 
