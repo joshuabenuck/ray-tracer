@@ -330,235 +330,240 @@ impl Canvas {
     }
 }
 
-#[test]
-fn tuple_is_point() {
-    let a: Tuple = (4.3, -4.2, 3.1, 1.0).into();
-    assert_eq!(4.3, a.x);
-    assert_eq!(-4.2, a.y);
-    assert_eq!(3.1, a.z);
-    assert_eq!(1.0, a.w);
-    assert_eq!(true, a.is_point());
-    assert_eq!(false, a.is_vector());
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-#[test]
-fn tuple_is_vector() {
-    let a: Tuple = (4.3, -4.2, 3.1, 0.0).into();
-    assert_eq!(4.3, a.x);
-    assert_eq!(-4.2, a.y);
-    assert_eq!(3.1, a.z);
-    assert_eq!(0.0, a.w);
-    assert_eq!(false, a.is_point());
-    assert_eq!(true, a.is_vector());
-}
-
-#[test]
-fn tuple_point() {
-    let p = Tuple::point(4.0, -4.0, 3.0);
-    let t = (4.0, -4.0, 3.0, 1.0).into();
-    assert_eq!(p, t);
-}
-
-#[test]
-fn tuple_vector() {
-    let v = Tuple::vector(4.0, -4.0, 3.0);
-    let t = (4.0, -4.0, 3.0, 0.0).into();
-    assert_eq!(v, t);
-}
-
-#[test]
-fn tuple_addition() {
-    let a1: Tuple = (3.0, -2.0, 5.0, 1.0).into();
-    let a2: Tuple = (-2.0, 3.0, 1.0, 0.0).into();
-    let a3: Tuple = (3.0, -2.0, 5.0, 1.0).into();
-    assert_eq!(a1 + a2, (1.0, 1.0, 6.0, 1.0).into());
-    let a4 = a3 + a3;
-    assert_eq!(false, a4.is_point());
-    assert_eq!(false, a4.is_vector());
-}
-
-#[test]
-fn tuple_subtraction() {
-    let p1 = Tuple::point(3.0, 2.0, 1.0);
-    let p2 = Tuple::point(5.0, 6.0, 7.0);
-    assert_eq!(p1 - p2, Tuple::vector(-2.0, -4.0, -6.0));
-
-    let p = Tuple::point(3.0, 2.0, 1.0);
-    let v = Tuple::vector(5.0, 6.0, 7.0);
-    assert_eq!(p - v, Tuple::point(-2.0, -4.0, -6.0));
-
-    let v1 = Tuple::vector(3.0, 2.0, 1.0);
-    let v2 = Tuple::vector(5.0, 6.0, 7.0);
-    assert_eq!(v1 - v2, Tuple::vector(-2.0, -4.0, -6.0));
-
-    let p = Tuple::point(3.0, 2.0, 1.0);
-    let v = Tuple::vector(5.0, 6.0, 7.0);
-    let invalid = v - p;
-    assert_eq!(false, invalid.is_point());
-    assert_eq!(false, invalid.is_vector());
-}
-
-#[test]
-fn tuple_negation() {
-    let zero = Tuple::vector(0.0, 0.0, 0.0);
-    let v = Tuple::vector(1.0, -2.0, 3.0);
-    assert_eq!(zero - v, Tuple::vector(-1.0, 2.0, -3.0));
-
-    let a: Tuple = (1.0, -2.0, 3.0, -4.0).into();
-    assert_eq!(-a, (-1.0, 2.0, -3.0, 4.0).into())
-}
-
-#[test]
-fn tuple_multiplication() {
-    let a: Tuple = (1.0, -2.0, 3.0, -4.0).into();
-    assert_eq!(a * 3.5, (3.5, -7.0, 10.5, -14.0).into());
-
-    let a: Tuple = (1.0, -2.0, 3.0, -4.0).into();
-    assert_eq!(a * 0.5, (0.5, -1.0, 1.5, -2.0).into());
-}
-
-#[test]
-fn tuple_division() {
-    let a: Tuple = (1.0, -2.0, 3.0, -4.0).into();
-    assert_eq!(a / 2.0, (0.5, -1.0, 1.5, -2.0).into());
-}
-
-#[test]
-fn vector_magnitude() {
-    let v = Tuple::vector(1.0, 0.0, 0.0);
-    assert_eq!(v.magnitude(), 1.0);
-
-    let v = Tuple::vector(0.0, 1.0, 0.0);
-    assert_eq!(v.magnitude(), 1.0);
-
-    let v = Tuple::vector(0.0, 0.0, 1.0);
-    assert_eq!(v.magnitude(), 1.0);
-
-    let v = Tuple::vector(1.0, 2.0, 3.0);
-    assert_eq!(v.magnitude(), (14.0_f64).sqrt());
-
-    let v = Tuple::vector(-1.0, -2.0, -3.0);
-    assert_eq!(v.magnitude(), (14.0_f64).sqrt());
-}
-
-#[test]
-fn vector_normalization() {
-    let v = Tuple::vector(4.0, 0.0, 0.0);
-    assert_eq!(v.normalize(), Tuple::vector(1.0, 0.0, 0.0));
-
-    let v = Tuple::vector(1.0, 2.0, 3.0);
-    // 1/14.sqrt, 2/14.sqrt, 3/14.sqrt
-    assert_eq!(v.normalize(), Tuple::vector(0.26726, 0.53452, 0.80178));
-}
-
-#[test]
-fn vector_dot_product() {
-    let a = Tuple::vector(1.0, 2.0, 3.0);
-    let b = Tuple::vector(2.0, 3.0, 4.0);
-    assert_eq!(a.dot(&b), 20.0);
-}
-
-#[test]
-fn vector_cross_product() {
-    let a = Tuple::vector(1.0, 2.0, 3.0);
-    let b = Tuple::vector(2.0, 3.0, 4.0);
-    assert_eq!(a * b, Tuple::vector(-1.0, 2.0, -1.0));
-    assert_eq!(b * a, Tuple::vector(1.0, -2.0, 1.0));
-}
-
-#[test]
-fn color() {
-    let c = Color::new(-0.5, 0.4, 1.7);
-    assert_eq!(c.red, -0.5);
-    assert_eq!(c.green, 0.4);
-    assert_eq!(c.blue, 1.7);
-}
-
-#[test]
-fn color_ops() {
-    let c1 = Color::new(0.9, 0.6, 0.75);
-    let c2 = Color::new(0.7, 0.1, 0.25);
-    assert_eq!(c1 + c2, Color::new(1.6, 0.7, 1.0));
-    assert_eq!(c1 - c2, Color::new(0.2, 0.5, 0.5));
-
-    let c = Color::new(0.2, 0.3, 0.4);
-    assert_eq!(c * 2.0, Color::new(0.4, 0.6, 0.8));
-
-    let c1 = Color::new(1.0, 0.2, 0.4);
-    let c2 = Color::new(0.9, 1.0, 0.1);
-    assert_eq!(c1 * c2, Color::new(0.9, 0.2, 0.04));
-}
-
-#[test]
-fn canvas_create() {
-    let mut c = Canvas::new(10, 20);
-    assert_eq!(c.width, 10);
-    assert_eq!(c.height, 20);
-    let black = Color::new(0.0, 0.0, 0.0);
-    for pixel in &c.pixels {
-        assert_eq!(pixel, &black);
+    #[test]
+    fn tuple_is_point() {
+        let a: Tuple = (4.3, -4.2, 3.1, 1.0).into();
+        assert_eq!(4.3, a.x);
+        assert_eq!(-4.2, a.y);
+        assert_eq!(3.1, a.z);
+        assert_eq!(1.0, a.w);
+        assert_eq!(true, a.is_point());
+        assert_eq!(false, a.is_vector());
     }
 
-    let red = Color::new(1.0, 0.0, 0.0);
-    c.write_pixel(2, 3, red);
-    assert_eq!(c.pixel_at(2, 3), red);
-}
+    #[test]
+    fn tuple_is_vector() {
+        let a: Tuple = (4.3, -4.2, 3.1, 0.0).into();
+        assert_eq!(4.3, a.x);
+        assert_eq!(-4.2, a.y);
+        assert_eq!(3.1, a.z);
+        assert_eq!(0.0, a.w);
+        assert_eq!(false, a.is_point());
+        assert_eq!(true, a.is_vector());
+    }
 
-#[test]
-fn canvs_to_ppm() {
-    let c = Canvas::new(5, 3);
-    let ppm = c.to_ppm();
-    let first_three = ["P3", "5 3", "255"];
-    assert_eq!(ppm.split("\n").take(3).collect::<Vec<&str>>(), first_three);
+    #[test]
+    fn tuple_point() {
+        let p = Tuple::point(4.0, -4.0, 3.0);
+        let t = (4.0, -4.0, 3.0, 1.0).into();
+        assert_eq!(p, t);
+    }
 
-    let mut c = Canvas::new(5, 3);
-    let c1 = Color::new(1.5, 0.0, 0.0);
-    let c2 = Color::new(0.0, 0.5, 0.0);
-    let c3 = Color::new(-0.5, 0.0, 1.0);
-    c.write_pixel(0, 0, c1);
-    c.write_pixel(2, 1, c2);
-    c.write_pixel(4, 2, c3);
-    let four_to_six = [
-        "255 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
-        "0 0 0 0 0 0 0 128 0 0 0 0 0 0 0",
-        "0 0 0 0 0 0 0 0 0 0 0 0 0 0 255",
-    ];
-    let ppm = c.to_ppm();
-    assert_eq!(
-        ppm.split("\n").skip(3).take(3).collect::<Vec<&str>>(),
-        four_to_six
-    );
+    #[test]
+    fn tuple_vector() {
+        let v = Tuple::vector(4.0, -4.0, 3.0);
+        let t = (4.0, -4.0, 3.0, 0.0).into();
+        assert_eq!(v, t);
+    }
 
-    let mut c = Canvas::new(10, 2);
-    c.pixels = vec![Color::new(1.0, 0.8, 0.6); c.width * c.height];
-    let four_to_seven = [
-        "255 204 153 255 204 153 255 204 153 255 204 153 255 204 153 255 204",
-        "153 255 204 153 255 204 153 255 204 153 255 204 153",
-        "255 204 153 255 204 153 255 204 153 255 204 153 255 204 153 255 204",
-        "153 255 204 153 255 204 153 255 204 153 255 204 153",
-    ];
-    let ppm = c.to_ppm();
-    assert_eq!(
-        ppm.split("\n").skip(3).take(4).collect::<Vec<&str>>(),
-        four_to_seven
-    );
+    #[test]
+    fn tuple_addition() {
+        let a1: Tuple = (3.0, -2.0, 5.0, 1.0).into();
+        let a2: Tuple = (-2.0, 3.0, 1.0, 0.0).into();
+        let a3: Tuple = (3.0, -2.0, 5.0, 1.0).into();
+        assert_eq!(a1 + a2, (1.0, 1.0, 6.0, 1.0).into());
+        let a4 = a3 + a3;
+        assert_eq!(false, a4.is_point());
+        assert_eq!(false, a4.is_vector());
+    }
 
-    let c = Canvas::new(5, 3);
-    let ppm = c.to_ppm();
-    assert_eq!(ppm.as_bytes()[ppm.len() - 1], '\n' as u8);
-}
+    #[test]
+    fn tuple_subtraction() {
+        let p1 = Tuple::point(3.0, 2.0, 1.0);
+        let p2 = Tuple::point(5.0, 6.0, 7.0);
+        assert_eq!(p1 - p2, Tuple::vector(-2.0, -4.0, -6.0));
 
-#[test]
-fn vector_reflection() {
-    // reflecting a vector approaching at 45 degrees
-    let v = Tuple::vector(1.0, -1.0, 0.0);
-    let n = Tuple::vector(0.0, 1.0, 0.0);
-    let r = v.reflect(&n);
-    assert_eq!(r, Tuple::vector(1.0, 1.0, 0.0));
+        let p = Tuple::point(3.0, 2.0, 1.0);
+        let v = Tuple::vector(5.0, 6.0, 7.0);
+        assert_eq!(p - v, Tuple::point(-2.0, -4.0, -6.0));
 
-    // reflecting a vector off a slanted surface
-    let v = Tuple::vector(0.0, -1.0, 0.0);
-    let n = Tuple::vector(2.0_f64.sqrt() / 2.0, 2.0_f64.sqrt() / 2.0, 0.0);
-    let r = v.reflect(&n);
-    assert_eq!(r, Tuple::vector(1.0, 0.0, 0.0));
+        let v1 = Tuple::vector(3.0, 2.0, 1.0);
+        let v2 = Tuple::vector(5.0, 6.0, 7.0);
+        assert_eq!(v1 - v2, Tuple::vector(-2.0, -4.0, -6.0));
+
+        let p = Tuple::point(3.0, 2.0, 1.0);
+        let v = Tuple::vector(5.0, 6.0, 7.0);
+        let invalid = v - p;
+        assert_eq!(false, invalid.is_point());
+        assert_eq!(false, invalid.is_vector());
+    }
+
+    #[test]
+    fn tuple_negation() {
+        let zero = Tuple::vector(0.0, 0.0, 0.0);
+        let v = Tuple::vector(1.0, -2.0, 3.0);
+        assert_eq!(zero - v, Tuple::vector(-1.0, 2.0, -3.0));
+
+        let a: Tuple = (1.0, -2.0, 3.0, -4.0).into();
+        assert_eq!(-a, (-1.0, 2.0, -3.0, 4.0).into())
+    }
+
+    #[test]
+    fn tuple_multiplication() {
+        let a: Tuple = (1.0, -2.0, 3.0, -4.0).into();
+        assert_eq!(a * 3.5, (3.5, -7.0, 10.5, -14.0).into());
+
+        let a: Tuple = (1.0, -2.0, 3.0, -4.0).into();
+        assert_eq!(a * 0.5, (0.5, -1.0, 1.5, -2.0).into());
+    }
+
+    #[test]
+    fn tuple_division() {
+        let a: Tuple = (1.0, -2.0, 3.0, -4.0).into();
+        assert_eq!(a / 2.0, (0.5, -1.0, 1.5, -2.0).into());
+    }
+
+    #[test]
+    fn vector_magnitude() {
+        let v = Tuple::vector(1.0, 0.0, 0.0);
+        assert_eq!(v.magnitude(), 1.0);
+
+        let v = Tuple::vector(0.0, 1.0, 0.0);
+        assert_eq!(v.magnitude(), 1.0);
+
+        let v = Tuple::vector(0.0, 0.0, 1.0);
+        assert_eq!(v.magnitude(), 1.0);
+
+        let v = Tuple::vector(1.0, 2.0, 3.0);
+        assert_eq!(v.magnitude(), (14.0_f64).sqrt());
+
+        let v = Tuple::vector(-1.0, -2.0, -3.0);
+        assert_eq!(v.magnitude(), (14.0_f64).sqrt());
+    }
+
+    #[test]
+    fn vector_normalization() {
+        let v = Tuple::vector(4.0, 0.0, 0.0);
+        assert_eq!(v.normalize(), Tuple::vector(1.0, 0.0, 0.0));
+
+        let v = Tuple::vector(1.0, 2.0, 3.0);
+        // 1/14.sqrt, 2/14.sqrt, 3/14.sqrt
+        assert_eq!(v.normalize(), Tuple::vector(0.26726, 0.53452, 0.80178));
+    }
+
+    #[test]
+    fn vector_dot_product() {
+        let a = Tuple::vector(1.0, 2.0, 3.0);
+        let b = Tuple::vector(2.0, 3.0, 4.0);
+        assert_eq!(a.dot(&b), 20.0);
+    }
+
+    #[test]
+    fn vector_cross_product() {
+        let a = Tuple::vector(1.0, 2.0, 3.0);
+        let b = Tuple::vector(2.0, 3.0, 4.0);
+        assert_eq!(a * b, Tuple::vector(-1.0, 2.0, -1.0));
+        assert_eq!(b * a, Tuple::vector(1.0, -2.0, 1.0));
+    }
+
+    #[test]
+    fn color() {
+        let c = Color::new(-0.5, 0.4, 1.7);
+        assert_eq!(c.red, -0.5);
+        assert_eq!(c.green, 0.4);
+        assert_eq!(c.blue, 1.7);
+    }
+
+    #[test]
+    fn color_ops() {
+        let c1 = Color::new(0.9, 0.6, 0.75);
+        let c2 = Color::new(0.7, 0.1, 0.25);
+        assert_eq!(c1 + c2, Color::new(1.6, 0.7, 1.0));
+        assert_eq!(c1 - c2, Color::new(0.2, 0.5, 0.5));
+
+        let c = Color::new(0.2, 0.3, 0.4);
+        assert_eq!(c * 2.0, Color::new(0.4, 0.6, 0.8));
+
+        let c1 = Color::new(1.0, 0.2, 0.4);
+        let c2 = Color::new(0.9, 1.0, 0.1);
+        assert_eq!(c1 * c2, Color::new(0.9, 0.2, 0.04));
+    }
+
+    #[test]
+    fn canvas_create() {
+        let mut c = Canvas::new(10, 20);
+        assert_eq!(c.width, 10);
+        assert_eq!(c.height, 20);
+        let black = Color::new(0.0, 0.0, 0.0);
+        for pixel in &c.pixels {
+            assert_eq!(pixel, &black);
+        }
+
+        let red = Color::new(1.0, 0.0, 0.0);
+        c.write_pixel(2, 3, red);
+        assert_eq!(c.pixel_at(2, 3), red);
+    }
+
+    #[test]
+    fn canvs_to_ppm() {
+        let c = Canvas::new(5, 3);
+        let ppm = c.to_ppm();
+        let first_three = ["P3", "5 3", "255"];
+        assert_eq!(ppm.split("\n").take(3).collect::<Vec<&str>>(), first_three);
+
+        let mut c = Canvas::new(5, 3);
+        let c1 = Color::new(1.5, 0.0, 0.0);
+        let c2 = Color::new(0.0, 0.5, 0.0);
+        let c3 = Color::new(-0.5, 0.0, 1.0);
+        c.write_pixel(0, 0, c1);
+        c.write_pixel(2, 1, c2);
+        c.write_pixel(4, 2, c3);
+        let four_to_six = [
+            "255 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+            "0 0 0 0 0 0 0 128 0 0 0 0 0 0 0",
+            "0 0 0 0 0 0 0 0 0 0 0 0 0 0 255",
+        ];
+        let ppm = c.to_ppm();
+        assert_eq!(
+            ppm.split("\n").skip(3).take(3).collect::<Vec<&str>>(),
+            four_to_six
+        );
+
+        let mut c = Canvas::new(10, 2);
+        c.pixels = vec![Color::new(1.0, 0.8, 0.6); c.width * c.height];
+        let four_to_seven = [
+            "255 204 153 255 204 153 255 204 153 255 204 153 255 204 153 255 204",
+            "153 255 204 153 255 204 153 255 204 153 255 204 153",
+            "255 204 153 255 204 153 255 204 153 255 204 153 255 204 153 255 204",
+            "153 255 204 153 255 204 153 255 204 153 255 204 153",
+        ];
+        let ppm = c.to_ppm();
+        assert_eq!(
+            ppm.split("\n").skip(3).take(4).collect::<Vec<&str>>(),
+            four_to_seven
+        );
+
+        let c = Canvas::new(5, 3);
+        let ppm = c.to_ppm();
+        assert_eq!(ppm.as_bytes()[ppm.len() - 1], '\n' as u8);
+    }
+
+    #[test]
+    fn vector_reflection() {
+        // reflecting a vector approaching at 45 degrees
+        let v = Tuple::vector(1.0, -1.0, 0.0);
+        let n = Tuple::vector(0.0, 1.0, 0.0);
+        let r = v.reflect(&n);
+        assert_eq!(r, Tuple::vector(1.0, 1.0, 0.0));
+
+        // reflecting a vector off a slanted surface
+        let v = Tuple::vector(0.0, -1.0, 0.0);
+        let n = Tuple::vector(2.0_f64.sqrt() / 2.0, 2.0_f64.sqrt() / 2.0, 0.0);
+        let r = v.reflect(&n);
+        assert_eq!(r, Tuple::vector(1.0, 0.0, 0.0));
+    }
 }
