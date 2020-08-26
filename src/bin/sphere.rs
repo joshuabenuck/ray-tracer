@@ -21,7 +21,7 @@ fn main() -> Result<(), std::io::Error> {
     //     Matrix4x4::shearing(1.0, 0.0, 0.0, 0.0, 0.0, 0.0) * Matrix4x4::scaling(0.5, 1.0, 1.0);
     let transform = Matrix4x4::identity();
 
-    let shape = Sphere::new(Some(transform));
+    let shape = Sphere::new(Some(transform), None);
     // for each row of pixels in the canvas
     for y in 0..canvas_pixels {
         // compute the world y coordinate (top = +half, bottom = -half)
