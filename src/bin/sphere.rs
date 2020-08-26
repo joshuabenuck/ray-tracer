@@ -1,4 +1,6 @@
-use ray_tracer::{Canvas, Color, Intersections, Matrix4x4, Ray, Sphere, Tuple};
+use ray_tracer::{
+    Canvas, Color, Intersections, Material, Matrix4x4, PointLight, Ray, Sphere, Tuple,
+};
 
 fn main() -> Result<(), std::io::Error> {
     let ray_origin = Tuple::point(0.0, 0.0, -5.0);
@@ -8,7 +10,6 @@ fn main() -> Result<(), std::io::Error> {
     let pixel_size = wall_size / canvas_pixels as f64;
     let half = wall_size / 2.0;
     let mut canvas = Canvas::new(canvas_pixels, canvas_pixels);
-    let color = Color::new(0.5, 0.0, 0.5);
     // // shrink it along the y axis​
     // let transform = Matrix4x4::scaling(1.0, 0.5, 1.0);
     // //# shrink it along the x axis​
@@ -21,7 +22,12 @@ fn main() -> Result<(), std::io::Error> {
     //     Matrix4x4::shearing(1.0, 0.0, 0.0, 0.0, 0.0, 0.0) * Matrix4x4::scaling(0.5, 1.0, 1.0);
     let transform = Matrix4x4::identity();
 
-    let shape = Sphere::new(Some(transform), None);
+    let mut material = Material::new();
+    material.color = Color::new(1.0, 0.2, 1.0);
+    let shape = Sphere::new(Some(transform), Some(material));
+    let light_position = Tuple::point(-10.0, 10.0, -10.0);
+    let light_color = Color::new(1.0, 1.0, 1.0);
+    let light = PointLight::new(light_position, light_color);
     // for each row of pixels in the canvas
     for y in 0..canvas_pixels {
         // compute the world y coordinate (top = +half, bottom = -half)
@@ -38,7 +44,11 @@ fn main() -> Result<(), std::io::Error> {
             let r = Ray::new(ray_origin, (position - ray_origin).normalize());
             let xs = shape.intersects(&r);
 
-            if xs.hit().is_some() {
+            if let Some(hit) = xs.hit() {
+                let point = r.position(hit.t);
+                let normal = hit.object.normal_at(point);
+                let eye = -r.direction;
+                let color = hit.object.material.lighting(&light, &point, &eye, &normal);
                 canvas.write_pixel(x, y, color);
             }
         }

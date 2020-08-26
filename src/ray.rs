@@ -2,8 +2,8 @@ use crate::{Color, Matrix4x4, Tuple};
 
 #[derive(Copy, Clone)]
 pub struct Ray {
-    origin: Tuple,
-    direction: Tuple,
+    pub origin: Tuple,
+    pub direction: Tuple,
 }
 
 impl Ray {
@@ -25,8 +25,8 @@ impl Ray {
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Sphere {
-    transform: Matrix4x4,
-    material: Material,
+    pub transform: Matrix4x4,
+    pub material: Material,
 }
 
 impl Sphere {
@@ -54,8 +54,8 @@ impl Sphere {
         let t1 = (-b - discriminant.sqrt()) / (2.0 * a);
         let t2 = (-b + discriminant.sqrt()) / (2.0 * a);
         vec![
-            Intersection::new(t1, Sphere::new(None, None)),
-            Intersection::new(t2, Sphere::new(None, None)),
+            Intersection::new(t1, self.clone()),
+            Intersection::new(t2, self.clone()),
         ]
     }
 
@@ -74,8 +74,8 @@ impl Sphere {
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Intersection {
-    t: f64,
-    object: Sphere,
+    pub t: f64,
+    pub object: Sphere,
 }
 
 impl Intersection {
@@ -119,11 +119,11 @@ impl PointLight {
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Material {
-    color: Color,
-    ambient: f64,
-    diffuse: f64,
-    specular: f64,
-    shininess: f64,
+    pub color: Color,
+    pub ambient: f64,
+    pub diffuse: f64,
+    pub specular: f64,
+    pub shininess: f64,
 }
 
 impl Material {
@@ -135,6 +135,50 @@ impl Material {
             specular: 0.9,
             shininess: 200.0,
         }
+    }
+
+    pub fn lighting(
+        &self,
+        light: &PointLight,
+        point: &Tuple,
+        eyev: &Tuple,
+        normalv: &Tuple,
+    ) -> Color {
+        // combine the surface color with the light's color / intensity
+        let effective_color = self.color * light.intensity;
+
+        // find the direction to the light source
+        let lightv = (light.position - *point).normalize();
+
+        // comput the ambient contribution
+        let ambient = effective_color * self.ambient;
+
+        // light_dot_normal represents the cosine of the angle between the
+        // light vector and the normal vector. A negative number means the
+        // light is on the other side of teh surface.
+        let light_dot_normal = lightv.dot(&normalv);
+        let (diffuse, specular) = if light_dot_normal < 0.0 {
+            (Color::new(0.0, 0.0, 0.0), Color::new(0.0, 0.0, 0.0))
+        } else {
+            // compute the diffuse contribution
+            let diffuse = effective_color * self.diffuse * light_dot_normal;
+
+            // reflect-dot_eye represents the cosine of the angle between the
+            // reflection vector and the eye vector. A negative number means the
+            // light reflects away from the eye.
+            let reflectv = -lightv.reflect(&normalv);
+            let reflect_dot_eye = reflectv.dot(eyev);
+
+            let specular = if reflect_dot_eye <= 0.0 {
+                Color::new(0.0, 0.0, 0.0)
+            } else {
+                // compute the specular contribution
+                let factor = reflect_dot_eye.powf(self.shininess);
+                light.intensity * self.specular * factor
+            };
+            (diffuse, specular)
+        };
+        ambient + diffuse + specular
     }
 }
 
@@ -386,5 +430,45 @@ mod tests {
     }
 
     #[test]
-    fn lighting() {}
+    fn lighting() {
+        let m = Material::new();
+        let position = Tuple::point(0.0, 0.0, 0.0);
+
+        // lighting with the eye between the light and the surface
+        // ambient, diffuse, and specular all at full strength
+        let eyev = Tuple::vector(0.0, 0.0, -1.0);
+        let normalv = Tuple::vector(0.0, 0.0, -1.0);
+        let light = PointLight::new(Tuple::point(0.0, 0.0, -10.0), Color::new(1.0, 1.0, 1.0));
+        let result = m.lighting(&light, &position, &eyev, &normalv);
+        assert_eq!(result, Color::new(1.9, 1.9, 1.9));
+
+        // lighting with the eye between light and surface, eye offset 45 degrees
+        // ambient and diffuse unchanged because the angle between them is unchanged
+        // specular drops off to effectively zero
+        let eyev = Tuple::vector(0.0, 2.0_f64.sqrt() / 2.0, 2.0_f64.sqrt() / 2.0);
+        let result = m.lighting(&light, &position, &eyev, &normalv);
+        assert_eq!(result, Color::new(1.0, 1.0, 1.0));
+
+        // lighting with eye opposite surface, light offset 45 degrees
+        let eyev = Tuple::vector(0.0, 0.0, -1.0);
+        let light = PointLight::new(Tuple::point(0.0, 10.0, -10.0), Color::new(1.0, 1.0, 1.0));
+        let result = m.lighting(&light, &position, &eyev, &normalv);
+        assert_eq!(result, Color::new(0.7364, 0.7364, 0.7364));
+
+        // lighting with eye in the path of the reflection vector
+        // makes specular at full strength with ambient and diffuse same as last test
+        let eyev = Tuple::vector(0.0, -2.0_f64.sqrt() / 2.0, -2.0_f64.sqrt() / 2.0);
+        let light = PointLight::new(Tuple::point(0.0, 10.0, -10.0), Color::new(1.0, 1.0, 1.0));
+        let result = m.lighting(&light, &position, &eyev, &normalv);
+        assert_eq!(result, Color::new(1.6364, 1.6364, 1.6364,));
+
+        // light with the light behind the surface
+        // Since the light doesn't illuminate the surface, the diffuse and specular
+        // components go to zero.
+        // The total intensity should be the same as the ambient component
+        let eyev = Tuple::vector(0.0, 0.0, -1.0);
+        let light = PointLight::new(Tuple::point(0.0, 0.0, 10.0), Color::new(1.0, 1.0, 1.0));
+        let result = m.lighting(&light, &position, &eyev, &normalv);
+        assert_eq!(result, Color::new(0.1, 0.1, 0.1));
+    }
 }
