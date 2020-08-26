@@ -56,6 +56,18 @@ impl Sphere {
             Intersection::new(t2, Sphere::new(None)),
         ]
     }
+
+    pub fn normal_at(&self, world_point: Tuple) -> Tuple {
+        let object_point = self.transform.inverse().unwrap() * world_point;
+        let object_normal = object_point - Tuple::point(0.0, 0.0, 0.0);
+        // technically should be self.tranform.submatrix(3, 3)
+        // to avoid messing with the w coordinate when there is any kind of translation
+        // in the transform
+        let mut world_normal = self.transform.inverse().unwrap().transpose() * object_normal;
+        // workaround to avoid the submatrix calculation
+        world_normal.w = 0.0;
+        world_normal.normalize()
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -88,8 +100,10 @@ impl Intersections for Vec<Intersection> {
     }
 }
 
+#[cfg(test)]
 mod tests {
     use super::*;
+    use std::f64::consts::PI;
 
     #[test]
     fn ray_create() {
@@ -232,6 +246,7 @@ mod tests {
         assert_eq!(s.transform, t);
     }
 
+    #[test]
     fn ray_intersection_with_scaled_sphere() {
         // intersecting a scaled sphere with a ray
         let r = Ray::new(Tuple::point(0.0, 0.0, -5.0), Tuple::vector(0.0, 0.0, 1.0));
@@ -245,5 +260,54 @@ mod tests {
         let s = Sphere::new(Some(Matrix4x4::translation(5.0, 0.0, 0.0)));
         let xs = s.intersects(&r);
         assert_eq!(xs.len(), 0);
+    }
+
+    #[test]
+    fn sphere_normal_at() {
+        // the normal on a sphere at a point on the x axis
+        let s = Sphere::new(None);
+        let n = s.normal_at(Tuple::point(1.0, 0.0, 0.0));
+        assert_eq!(n, Tuple::vector(1.0, 0.0, 0.0));
+
+        // the normal on a sphere at a point on the y axis
+        let n = s.normal_at(Tuple::point(0.0, 1.0, 0.0));
+        assert_eq!(n, Tuple::vector(0.0, 1.0, 0.0));
+
+        // the normal on a sphere at a point on the y axis
+        let n = s.normal_at(Tuple::point(0.0, 0.0, 1.0));
+        assert_eq!(n, Tuple::vector(0.0, 0.0, 1.0));
+
+        // the normal on a sphere at a point on a nonaxial point
+        let n = s.normal_at(Tuple::point(
+            3.0_f64.sqrt() / 3.0,
+            3.0_f64.sqrt() / 3.0,
+            3.0_f64.sqrt() / 3.0,
+        ));
+        assert_eq!(
+            n,
+            Tuple::vector(
+                3.0_f64.sqrt() / 3.0,
+                3.0_f64.sqrt() / 3.0,
+                3.0_f64.sqrt() / 3.0
+            )
+        );
+
+        // the normal is a normalized vector
+        assert_eq!(n, n.normalize());
+    }
+
+    #[test]
+    fn sphere_transformed_normal() {
+        // computing the normal on a translated sphere
+        let s = Sphere::new(Some(Matrix4x4::translation(0.0, 1.0, 0.0)));
+        let n = s.normal_at(Tuple::point(0.0, 1.70711, -0.70711));
+        assert_eq!(n, Tuple::vector(0.0, 0.70711, -0.70711));
+
+        // computing the normal on a transformed sphere
+        let s = Sphere::new(Some(
+            Matrix4x4::scaling(1.0, 0.5, 1.0) * Matrix4x4::rotation_z(PI / 5.0),
+        ));
+        let n = s.normal_at(Tuple::point(0.0, 2.0_f64 / 2.0, -2.0_f64 / 2.0));
+        assert_eq!(n, Tuple::vector(0.0, 0.97014, -0.24254));
     }
 }

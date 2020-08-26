@@ -57,6 +57,10 @@ impl Tuple {
     pub fn dot(&self, other: &Tuple) -> f64 {
         self.x * other.x + self.y * other.y + self.z * other.z + self.w * other.w
     }
+
+    pub fn reflect(&self, normal: &Tuple) -> Tuple {
+        *self - *normal * 2.0 * self.dot(normal)
+    }
 }
 
 impl From<(f64, f64, f64, f64)> for Tuple {
@@ -542,4 +546,19 @@ fn canvs_to_ppm() {
     let c = Canvas::new(5, 3);
     let ppm = c.to_ppm();
     assert_eq!(ppm.as_bytes()[ppm.len() - 1], '\n' as u8);
+}
+
+#[test]
+fn vector_reflection() {
+    // reflecting a vector approaching at 45 degrees
+    let v = Tuple::vector(1.0, -1.0, 0.0);
+    let n = Tuple::vector(0.0, 1.0, 0.0);
+    let r = v.reflect(&n);
+    assert_eq!(r, Tuple::vector(1.0, 1.0, 0.0));
+
+    // reflecting a vector off a slanted surface
+    let v = Tuple::vector(0.0, -1.0, 0.0);
+    let n = Tuple::vector(2.0_f64.sqrt() / 2.0, 2.0_f64.sqrt() / 2.0, 0.0);
+    let r = v.reflect(&n);
+    assert_eq!(r, Tuple::vector(1.0, 0.0, 0.0));
 }
