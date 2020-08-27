@@ -3,6 +3,16 @@ use std::ops::{Add, Div, Mul, Neg, Sub};
 
 const EPSILON: f64 = 0.00001;
 
+#[inline]
+pub fn pt(x: f64, y: f64, z: f64) -> Tuple {
+    Tuple::point(x, y, z)
+}
+
+#[inline]
+pub fn v(x: f64, y: f64, z: f64) -> Tuple {
+    Tuple::vector(x, y, z)
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct Tuple {
     pub x: f64,
