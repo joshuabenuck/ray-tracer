@@ -83,18 +83,18 @@ pub fn view_transform(from: Tuple, to: Tuple, up: Tuple) -> Matrix4x4 {
     orientation * Matrix4x4::translation(-from.x, -from.y, -from.z)
 }
 
-struct Camera {
-    hsize: usize,
-    vsize: usize,
-    field_of_view: f64,
-    transform: Matrix4x4,
+pub struct Camera {
+    pub hsize: usize,
+    pub vsize: usize,
+    pub field_of_view: f64,
+    pub transform: Matrix4x4,
     pixel_size: f64,
     half_width: f64,
     half_height: f64,
 }
 
 impl Camera {
-    fn new(hsize: usize, vsize: usize, field_of_view: f64) -> Camera {
+    pub fn new(hsize: usize, vsize: usize, field_of_view: f64) -> Camera {
         let hsize = hsize as f64;
         let vsize = vsize as f64;
         let half_view = (field_of_view / 2.0).tan();
