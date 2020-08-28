@@ -69,6 +69,20 @@ impl Default for World {
     }
 }
 
+pub fn view_transform(from: Tuple, to: Tuple, up: Tuple) -> Matrix4x4 {
+    let forward = (to - from).normalize();
+    let upn = up.normalize();
+    let left = forward * upn;
+    let true_up = left * forward;
+    let orientation = Matrix4x4([
+        [left.x, left.y, left.z, 0.0],
+        [true_up.x, true_up.y, true_up.z, 0.0],
+        [-forward.x, -forward.y, -forward.z, 0.0],
+        [0.0, 0.0, 0.0, 1.0],
+    ]);
+    orientation * Matrix4x4::translation(-from.x, -from.y, -from.z)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -154,5 +168,44 @@ mod tests {
         let r = Ray::new(pt(0.0, 0.0, 0.75), v(0.0, 0.0, -1.0));
         let c = w.color_at(&r);
         assert_eq!(c, w.objects[1].material.color);
+    }
+
+    #[test]
+    fn view_transform_() {
+        // the transformation matrix for the default orientation
+        let from = pt(0.0, 0.0, 0.0);
+        let to = pt(0.0, 0.0, -1.0);
+        let up = v(0.0, 1.0, 0.0);
+        let t = view_transform(from, to, up);
+        assert_eq!(t, Matrix4x4::identity());
+
+        // a view transformation matrix looking in positive z direction
+        let from = pt(0.0, 0.0, 0.0);
+        let to = pt(0.0, 0.0, 1.0);
+        let up = v(0.0, 1.0, 0.0);
+        let t = view_transform(from, to, up);
+        assert_eq!(t, Matrix4x4::scaling(-1.0, 1.0, -1.0));
+
+        // the view transformation moves the world
+        let from = pt(0.0, 0.0, 8.0);
+        let to = pt(0.0, 0.0, 0.0);
+        let up = v(0.0, 1.0, 0.0);
+        let t = view_transform(from, to, up);
+        assert_eq!(t, Matrix4x4::translation(0.0, 0.0, -8.0));
+
+        // an arbitrary view transformation
+        let from = pt(1.0, 3.0, 2.0);
+        let to = pt(4.0, -2.0, 8.0);
+        let up = v(1.0, 1.0, 0.0);
+        let t = view_transform(from, to, up);
+        assert_eq!(
+            t,
+            Matrix4x4([
+                [-0.50709, 0.50709, 0.67612, -2.36643],
+                [0.76772, 0.60609, 0.12122, -2.82843],
+                [-0.35857, 0.59761, -0.71714, 0.0],
+                [0.0, 0.0, 0.0, 1.0]
+            ])
+        );
     }
 }

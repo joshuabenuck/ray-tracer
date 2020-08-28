@@ -80,7 +80,7 @@ impl Index<usize> for Matrix3x3 {
 }
 
 #[derive(Debug, Copy, Clone)]
-pub struct Matrix4x4([[f64; 4]; 4]);
+pub struct Matrix4x4(pub [[f64; 4]; 4]);
 
 impl Matrix4x4 {
     pub fn identity() -> Matrix4x4 {
@@ -265,6 +265,7 @@ impl PartialEq for Matrix4x4 {
         for row in 0..4 {
             for col in 0..4 {
                 if !equal(a[row][col], b[row][col]) {
+                    // println!("{} {} {} {}", row, col, a[row][col], b[row][col]);
                     return false;
                 }
             }
