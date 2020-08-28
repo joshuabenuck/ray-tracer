@@ -1,4 +1,4 @@
-use crate::{Color, Matrix4x4, Tuple};
+use crate::{Color, Matrix4x4, Tuple, EPSILON};
 
 #[derive(Copy, Clone)]
 pub struct Ray {
@@ -79,6 +79,7 @@ pub struct Comps {
     pub eyev: Tuple,
     pub normalv: Tuple,
     pub inside: bool,
+    pub over_point: Tuple,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -102,6 +103,8 @@ impl Intersection {
         let eyev = -ray.direction;
         let normalv = object.normal_at(point);
         let inside = normalv.dot(&eyev) < 0.0;
+        let normalv = if inside { -normalv } else { normalv };
+        let over_point = point + normalv * EPSILON;
 
         // instantiate a data structure for storing some precomputed values
         Comps {
@@ -109,8 +112,9 @@ impl Intersection {
             object,
             point,
             eyev,
-            normalv: if inside { -normalv } else { normalv },
+            normalv,
             inside,
+            over_point,
         }
     }
 }
@@ -135,8 +139,8 @@ impl Intersections for Vec<Intersection> {
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct PointLight {
-    position: Tuple,
-    intensity: Color,
+    pub position: Tuple,
+    pub intensity: Color,
 }
 
 impl PointLight {
@@ -174,6 +178,7 @@ impl Material {
         point: &Tuple,
         eyev: &Tuple,
         normalv: &Tuple,
+        in_shadow: bool,
     ) -> Color {
         // combine the surface color with the light's color / intensity
         let effective_color = self.color * light.intensity;
@@ -183,6 +188,9 @@ impl Material {
 
         // comput the ambient contribution
         let ambient = effective_color * self.ambient;
+        if in_shadow {
+            return ambient;
+        }
 
         // light_dot_normal represents the cosine of the angle between the
         // light vector and the normal vector. A negative number means the
@@ -470,27 +478,32 @@ mod tests {
         let eyev = Tuple::vector(0.0, 0.0, -1.0);
         let normalv = Tuple::vector(0.0, 0.0, -1.0);
         let light = PointLight::new(Tuple::point(0.0, 0.0, -10.0), Color::new(1.0, 1.0, 1.0));
-        let result = m.lighting(&light, &position, &eyev, &normalv);
+        let result = m.lighting(&light, &position, &eyev, &normalv, false);
         assert_eq!(result, Color::new(1.9, 1.9, 1.9));
+
+        // lighting with the surface in shadow
+        let in_shadow = true;
+        let result = m.lighting(&light, &position, &eyev, &normalv, in_shadow);
+        assert_eq!(result, Color::new(0.1, 0.1, 0.1));
 
         // lighting with the eye between light and surface, eye offset 45 degrees
         // ambient and diffuse unchanged because the angle between them is unchanged
         // specular drops off to effectively zero
         let eyev = Tuple::vector(0.0, 2.0_f64.sqrt() / 2.0, 2.0_f64.sqrt() / 2.0);
-        let result = m.lighting(&light, &position, &eyev, &normalv);
+        let result = m.lighting(&light, &position, &eyev, &normalv, false);
         assert_eq!(result, Color::new(1.0, 1.0, 1.0));
 
         // lighting with eye opposite surface, light offset 45 degrees
         let eyev = Tuple::vector(0.0, 0.0, -1.0);
         let light = PointLight::new(Tuple::point(0.0, 10.0, -10.0), Color::new(1.0, 1.0, 1.0));
-        let result = m.lighting(&light, &position, &eyev, &normalv);
+        let result = m.lighting(&light, &position, &eyev, &normalv, false);
         assert_eq!(result, Color::new(0.7364, 0.7364, 0.7364));
 
         // lighting with eye in the path of the reflection vector
         // makes specular at full strength with ambient and diffuse same as last test
         let eyev = Tuple::vector(0.0, -2.0_f64.sqrt() / 2.0, -2.0_f64.sqrt() / 2.0);
         let light = PointLight::new(Tuple::point(0.0, 10.0, -10.0), Color::new(1.0, 1.0, 1.0));
-        let result = m.lighting(&light, &position, &eyev, &normalv);
+        let result = m.lighting(&light, &position, &eyev, &normalv, false);
         assert_eq!(result, Color::new(1.6364, 1.6364, 1.6364,));
 
         // light with the light behind the surface
@@ -499,7 +512,7 @@ mod tests {
         // The total intensity should be the same as the ambient component
         let eyev = Tuple::vector(0.0, 0.0, -1.0);
         let light = PointLight::new(Tuple::point(0.0, 0.0, 10.0), Color::new(1.0, 1.0, 1.0));
-        let result = m.lighting(&light, &position, &eyev, &normalv);
+        let result = m.lighting(&light, &position, &eyev, &normalv, false);
         assert_eq!(result, Color::new(0.1, 0.1, 0.1));
     }
 

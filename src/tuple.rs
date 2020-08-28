@@ -1,7 +1,6 @@
+use crate::EPSILON;
 use std::cmp::{max, min};
 use std::ops::{Add, Div, Mul, Neg, Sub};
-
-const EPSILON: f64 = 0.00001;
 
 #[inline]
 pub fn pt(x: f64, y: f64, z: f64) -> Tuple {
