@@ -278,7 +278,7 @@ impl Material {
         in_shadow: bool,
     ) -> Color {
         let color = if let Some(pattern) = self.pattern {
-            pattern.stripe_at_object(*object, *point)
+            pattern.pattern_at_object(*object, *point)
         } else {
             self.color
         };
