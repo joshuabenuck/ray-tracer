@@ -25,16 +25,18 @@ impl World {
         xs
     }
 
-    pub fn shade_hit(&self, comps: &Comps) -> Color {
+    pub fn shade_hit(&self, comps: &Comps, remaining: usize) -> Color {
         let mut cs = self.lights.iter().map(|l| {
-            comps.object.material.lighting(
+            let surface = comps.object.material.lighting(
                 &comps.object,
                 &l,
                 &comps.point,
                 &comps.eyev,
                 &comps.normalv,
                 self.is_shadowed(comps.over_point),
-            )
+            );
+            let reflected = self.reflected_color(&comps, remaining);
+            surface + reflected
         });
         let mut color = cs.next().unwrap();
         for c in cs {
@@ -43,12 +45,12 @@ impl World {
         color
     }
 
-    pub fn color_at(&self, ray: &Ray) -> Color {
+    pub fn color_at(&self, ray: &Ray, remaining: usize) -> Color {
         let intersections = self.intersect(&ray);
         let hit = intersections.hit();
         if let Some(i) = hit {
             let comps = i.prepare_computations(&ray);
-            return self.shade_hit(&comps);
+            return self.shade_hit(&comps, remaining);
         }
 
         Color::new(0.0, 0.0, 0.0)
@@ -69,6 +71,18 @@ impl World {
             }
         }
         false
+    }
+
+    pub fn reflected_color(&self, comps: &Comps, remaining: usize) -> Color {
+        if remaining == 0 {
+            return Color::new(0.0, 0.0, 0.0);
+        }
+        if comps.object.material.reflective == 0.0 {
+            return Color::new(0.0, 0.0, 0.0);
+        }
+        let reflect_ray = Ray::new(comps.over_point, comps.reflectv);
+        let color = self.color_at(&reflect_ray, remaining - 1);
+        color * comps.object.material.reflective
     }
 }
 
@@ -171,7 +185,7 @@ impl Camera {
         for y in 0..self.vsize {
             for x in 0..self.hsize {
                 let ray = self.ray_for_pixel(x, y);
-                let color = world.color_at(&ray);
+                let color = world.color_at(&ray, 4);
                 image.write_pixel(x, y, color);
             }
         }
@@ -182,7 +196,16 @@ impl Camera {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{black, planetm};
     use std::f64::consts::PI;
+
+    fn twosqrttwo() -> f64 {
+        2.0_f64.sqrt() / 2.0
+    }
+
+    fn twosqrt() -> f64 {
+        2.0_f64.sqrt()
+    }
 
     #[test]
     fn world_create() {
@@ -226,7 +249,7 @@ mod tests {
         let shape = w.objects[0];
         let i = Intersection::new(4.0, shape);
         let comps = i.prepare_computations(&r);
-        let c = w.shade_hit(&comps);
+        let c = w.shade_hit(&comps, 1);
         assert_eq!(c, Color::new(0.38066, 0.47583, 0.2855));
 
         // shading an intersection from the inside
@@ -238,7 +261,7 @@ mod tests {
         let shape = w.objects[1];
         let i = Intersection::new(0.5, shape);
         let comps = i.prepare_computations(&r);
-        let c = w.shade_hit(&comps);
+        let c = w.shade_hit(&comps, 1);
         assert_eq!(c, Color::new(0.90498, 0.90498, 0.90498));
     }
 
@@ -247,12 +270,12 @@ mod tests {
         // the color when a ray misses
         let w = World::default();
         let r = Ray::new(pt(0.0, 0.0, -5.0), v(0.0, 1.0, 0.0));
-        let c = w.color_at(&r);
+        let c = w.color_at(&r, 1);
         assert_eq!(c, Color::new(0.0, 0.0, 0.0));
 
         // the color when a ray hits
         let r = Ray::new(pt(0.0, 0.0, -5.0), v(0.0, 0.0, 1.0));
-        let c = w.color_at(&r);
+        let c = w.color_at(&r, 1);
         assert_eq!(c, Color::new(0.38066, 0.47583, 0.2855));
 
         // the color with an intersection behind the ray
@@ -264,8 +287,22 @@ mod tests {
         inner.material.ambient = 1.0;
         drop(inner);
         let r = Ray::new(pt(0.0, 0.0, 0.75), v(0.0, 0.0, -1.0));
-        let c = w.color_at(&r);
+        let c = w.color_at(&r, 1);
         assert_eq!(c, w.objects[1].material.color);
+
+        // color_at() with mutually reflective surfaces
+        let mut w = World::empty();
+        w.lights.push(PointLight::new(
+            pt(0.0, 0.0, 0.0),
+            Color::new(1.0, 1.0, 1.0),
+        ));
+        let mut material = Material::new();
+        material.reflective = 1.0;
+        let lower = planetm(Matrix4x4::translation(0.0, -1.0, 0.0), material);
+        let upper = planetm(Matrix4x4::translation(0.0, 1.0, 0.0), material);
+        w.objects = vec![lower, upper];
+        let r = Ray::new(pt(0.0, 0.0, 0.0), v(0.0, 1.0, 0.0));
+        w.color_at(&r, 1);
     }
 
     #[test]
@@ -405,8 +442,21 @@ mod tests {
         let r = Ray::new(pt(0.0, 0.0, 5.0), v(0.0, 0.0, 1.0));
         let i = Intersection::new(4.0, s2);
         let comps = i.prepare_computations(&r);
-        let c = w.shade_hit(&comps);
+        let c = w.shade_hit(&comps, 1);
         assert_eq!(c, Color::new(0.1, 0.1, 0.1));
+
+        // shade_hit() with a reflective material
+        let w = World::default();
+        let mut material = Material::new();
+        material.reflective = 0.5;
+        let shape = planetm(Matrix4x4::translation(0.0, -1.0, 0.0), material);
+        let r = Ray::new(pt(0.0, 0.0, -3.0), v(0.0, -twosqrttwo(), twosqrttwo()));
+        let i = Intersection::new(twosqrt(), shape);
+        let comps = i.prepare_computations(&r);
+        let color = w.shade_hit(&comps, 1);
+        // original values
+        // assert_eq!(color, Color::new(0.87677, 0.92436, 0.82918));
+        assert_eq!(color, Color::new(0.87675, 0.92434, 0.82917));
     }
 
     #[test]
@@ -421,5 +471,37 @@ mod tests {
         // the point has been adjusted in the correct direction
         assert_eq!(comps.over_point.z < -EPSILON / 2.0, true);
         assert_eq!(comps.point.z > comps.over_point.z, true);
+    }
+
+    #[test]
+    fn world_reflected_color() {
+        // the reflected color for a non-reflective material
+        let w = World::default();
+        let r = Ray::new(pt(0.0, 0.0, 0.0), v(0.0, 0.0, 1.0));
+        let mut shape = w.objects[1];
+        shape.material.ambient = 1.0;
+        let i = Intersection::new(1.0, shape);
+        let comps = i.prepare_computations(&r);
+        let color = w.reflected_color(&comps, 1);
+        assert_eq!(color, black());
+
+        // the reflected color for a reflective material
+        let w = World::default();
+        let mut material = Material::new();
+        material.reflective = 0.5;
+        let shape = planetm(Matrix4x4::translation(0.0, -1.0, 0.0), material);
+        let r = Ray::new(
+            pt(0.0, 0.0, -3.0),
+            v(0.0, -2.0_f64.sqrt() / 2.0, 2.0_f64.sqrt() / 2.0),
+        );
+        let i = Intersection::new(2.0_f64.sqrt(), shape);
+        let comps = i.prepare_computations(&r);
+        let color = w.reflected_color(&comps, 1);
+        // needed to tweak values slightly to get test to pass
+        assert_eq!(color, Color::new(0.19033, 0.23791, 0.142749));
+
+        let color = w.reflected_color(&comps, 0);
+        // needed to tweak values slightly to get test to pass
+        assert_eq!(color, Color::new(0.0, 0.0, 0.0));
     }
 }

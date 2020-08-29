@@ -172,6 +172,7 @@ pub struct Comps {
     pub point: Tuple,
     pub eyev: Tuple,
     pub normalv: Tuple,
+    pub reflectv: Tuple,
     pub inside: bool,
     pub over_point: Tuple,
 }
@@ -198,6 +199,7 @@ impl Intersection {
         let normalv = object.normal_at(point);
         let inside = normalv.dot(&eyev) < 0.0;
         let normalv = if inside { -normalv } else { normalv };
+        let reflectv = ray.direction.reflect(&normalv);
         let over_point = point + normalv * EPSILON;
 
         // instantiate a data structure for storing some precomputed values
@@ -207,6 +209,7 @@ impl Intersection {
             point,
             eyev,
             normalv,
+            reflectv,
             inside,
             over_point,
         }
@@ -254,6 +257,7 @@ pub struct Material {
     pub diffuse: f64,
     pub specular: f64,
     pub shininess: f64,
+    pub reflective: f64,
 }
 
 impl Material {
@@ -265,6 +269,7 @@ impl Material {
             diffuse: 0.9,
             specular: 0.9,
             shininess: 200.0,
+            reflective: 0.0,
         }
     }
 
@@ -622,6 +627,9 @@ mod tests {
         assert_eq!(m.diffuse, 0.9);
         assert_eq!(m.specular, 0.9);
         assert_eq!(m.shininess, 200.0);
+
+        // reflectivity for the default material
+        assert_eq!(m.reflective, 0.0);
     }
 
     #[test]
@@ -728,5 +736,18 @@ mod tests {
         assert_eq!(comps.inside, true);
         // normal would have been (0.0, 0.0, 1.0), but is inverted!
         assert_eq!(comps.normalv, v(0.0, 0.0, -1.0));
+
+        // precomputing the reflection vector
+        let shape = plane();
+        let r = Ray::new(
+            pt(0.0, 1.0, -1.0),
+            v(0.0, -2.0_f64.sqrt() / 2.0, 2.0_f64.sqrt() / 2.0),
+        );
+        let i = Intersection::new(2.0_f64.sqrt(), shape);
+        let comps = i.prepare_computations(&r);
+        assert_eq!(
+            comps.reflectv,
+            v(0.0, 2.0_f64.sqrt() / 2.0, 2.0_f64.sqrt() / 2.0)
+        );
     }
 }
