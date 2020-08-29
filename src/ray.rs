@@ -1,6 +1,6 @@
-use crate::{Color, Matrix4x4, Tuple, EPSILON};
+use crate::{pt, v, Color, Matrix4x4, Tuple, EPSILON};
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Ray {
     pub origin: Tuple,
     pub direction: Tuple,
@@ -24,44 +24,93 @@ impl Ray {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub struct Sphere {
-    pub transform: Matrix4x4,
-    pub material: Material,
+pub enum ShapeForm {
+    Test,
+    Sphere,
+    Plane,
 }
 
-impl Sphere {
-    pub fn new(transform: Option<Matrix4x4>, material: Option<Material>) -> Sphere {
-        Sphere {
-            transform: transform.unwrap_or(Matrix4x4::identity()),
-            material: material.unwrap_or(Material::new()),
-        }
-    }
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct Shape {
+    pub transform: Matrix4x4,
+    pub material: Material,
+    pub form: ShapeForm,
+}
 
+static mut SAVED_RAY: Option<Ray> = None;
+
+pub fn test_shape() -> Shape {
+    Shape {
+        transform: Matrix4x4::identity(),
+        material: Material::new(),
+        form: ShapeForm::Test,
+    }
+}
+
+#[inline]
+pub fn sphere() -> Shape {
+    spheretm(Matrix4x4::identity(), Material::new())
+}
+
+pub fn spheretm(transform: Matrix4x4, material: Material) -> Shape {
+    Shape {
+        transform,
+        material,
+        form: ShapeForm::Sphere,
+    }
+}
+
+#[inline]
+pub fn spheret(transform: Matrix4x4) -> Shape {
+    spheretm(transform, Material::new())
+}
+
+#[inline]
+pub fn spherem(material: Material) -> Shape {
+    spheretm(Matrix4x4::identity(), material)
+}
+
+impl Shape {
     pub fn intersects(&self, ray: &Ray) -> Vec<Intersection> {
         let ray = ray.transform(self.transform.inverse().unwrap());
-        let sphere_to_ray = ray.origin - Tuple::point(0.0, 0.0, 0.0);
+        self.local_intersects(&ray)
+    }
 
-        let a = ray.direction.dot(&ray.direction);
-        let b = 2.0 * ray.direction.dot(&sphere_to_ray);
-        let c = sphere_to_ray.dot(&sphere_to_ray) - 1.0;
+    pub fn local_intersects(&self, ray: &Ray) -> Vec<Intersection> {
+        match self.form {
+            ShapeForm::Test => {
+                unsafe {
+                    SAVED_RAY = Some(*ray);
+                }
+                Vec::new()
+            }
+            ShapeForm::Sphere => {
+                let sphere_to_ray = ray.origin - pt(0.0, 0.0, 0.0);
 
-        let discriminant = (b * b) - 4.0 * a * c;
+                let a = ray.direction.dot(&ray.direction);
+                let b = 2.0 * ray.direction.dot(&sphere_to_ray);
+                let c = sphere_to_ray.dot(&sphere_to_ray) - 1.0;
 
-        if discriminant < 0.0 {
-            return Vec::new();
+                let discriminant = (b * b) - 4.0 * a * c;
+
+                if discriminant < 0.0 {
+                    return Vec::new();
+                }
+
+                let t1 = (-b - discriminant.sqrt()) / (2.0 * a);
+                let t2 = (-b + discriminant.sqrt()) / (2.0 * a);
+                vec![
+                    Intersection::new(t1, self.clone()),
+                    Intersection::new(t2, self.clone()),
+                ]
+            }
+            _ => Vec::new(),
         }
-
-        let t1 = (-b - discriminant.sqrt()) / (2.0 * a);
-        let t2 = (-b + discriminant.sqrt()) / (2.0 * a);
-        vec![
-            Intersection::new(t1, self.clone()),
-            Intersection::new(t2, self.clone()),
-        ]
     }
 
     pub fn normal_at(&self, world_point: Tuple) -> Tuple {
         let object_point = self.transform.inverse().unwrap() * world_point;
-        let object_normal = object_point - Tuple::point(0.0, 0.0, 0.0);
+        let object_normal = self.local_normal_at(object_point);
         // technically should be self.tranform.submatrix(3, 3)
         // to avoid messing with the w coordinate when there is any kind of translation
         // in the transform
@@ -70,11 +119,19 @@ impl Sphere {
         world_normal.w = 0.0;
         world_normal.normalize()
     }
+
+    pub fn local_normal_at(&self, local_point: Tuple) -> Tuple {
+        match self.form {
+            ShapeForm::Test => v(local_point.x, local_point.y, local_point.z),
+            ShapeForm::Sphere => local_point - pt(0.0, 0.0, 0.0),
+            _ => unreachable!(),
+        }
+    }
 }
 
 pub struct Comps {
     pub t: f64,
-    pub object: Sphere,
+    pub object: Shape,
     pub point: Tuple,
     pub eyev: Tuple,
     pub normalv: Tuple,
@@ -85,11 +142,11 @@ pub struct Comps {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Intersection {
     pub t: f64,
-    pub object: Sphere,
+    pub object: Shape,
 }
 
 impl Intersection {
-    pub fn new(t: f64, object: Sphere) -> Intersection {
+    pub fn new(t: f64, object: Shape) -> Intersection {
         Intersection { t, object }
     }
 
@@ -229,8 +286,8 @@ mod tests {
     #[test]
     fn ray_create() {
         // creating and querying a ray
-        let origin = Tuple::point(1.0, 2.0, 3.0);
-        let direction = Tuple::vector(4.0, 5.0, 6.0);
+        let origin = pt(1.0, 2.0, 3.0);
+        let direction = v(4.0, 5.0, 6.0);
         let r = Ray::new(origin, direction);
         assert_eq!(r.origin, origin);
         assert_eq!(r.direction, direction);
@@ -239,46 +296,46 @@ mod tests {
     #[test]
     fn ray_point_from_distance() {
         // computing a point from a distance
-        let r = Ray::new(Tuple::point(2.0, 3.0, 4.0), Tuple::vector(1.0, 0.0, 0.0));
-        assert_eq!(r.position(0.0), Tuple::point(2.0, 3.0, 4.0));
-        assert_eq!(r.position(1.0), Tuple::point(3.0, 3.0, 4.0));
-        assert_eq!(r.position(-1.0), Tuple::point(1.0, 3.0, 4.0));
-        assert_eq!(r.position(2.5), Tuple::point(4.5, 3.0, 4.0));
+        let r = Ray::new(pt(2.0, 3.0, 4.0), v(1.0, 0.0, 0.0));
+        assert_eq!(r.position(0.0), pt(2.0, 3.0, 4.0));
+        assert_eq!(r.position(1.0), pt(3.0, 3.0, 4.0));
+        assert_eq!(r.position(-1.0), pt(1.0, 3.0, 4.0));
+        assert_eq!(r.position(2.5), pt(4.5, 3.0, 4.0));
     }
 
     #[test]
     fn ray_sphere_intersection() {
         // a ray intersects a sphere at two points
-        let r = Ray::new(Tuple::point(0.0, 0.0, -5.0), Tuple::vector(0.0, 0.0, 1.0));
-        let s = Sphere::new(None, None);
+        let r = Ray::new(pt(0.0, 0.0, -5.0), v(0.0, 0.0, 1.0));
+        let s = sphere();
         let xs = s.intersects(&r);
         assert_eq!(xs.len(), 2);
         assert_eq!(xs[0].t, 4.0);
-        assert_eq!(xs[0].object, Sphere::new(None, None));
+        assert_eq!(xs[0].object, sphere());
         assert_eq!(xs[1].t, 6.0);
-        assert_eq!(xs[1].object, Sphere::new(None, None));
+        assert_eq!(xs[1].object, sphere());
 
         // a ray intersects a sphere at a tangent
-        let r = Ray::new(Tuple::point(0.0, 1.0, -5.0), Tuple::vector(0.0, 0.0, 1.0));
+        let r = Ray::new(pt(0.0, 1.0, -5.0), v(0.0, 0.0, 1.0));
         let xs = s.intersects(&r);
         assert_eq!(xs.len(), 2);
         assert_eq!(xs[0].t, 5.0);
         assert_eq!(xs[1].t, 5.0);
 
         // a ray misses a sphere
-        let r = Ray::new(Tuple::point(0.0, 2.0, -5.0), Tuple::vector(0.0, 0.0, 1.0));
+        let r = Ray::new(pt(0.0, 2.0, -5.0), v(0.0, 0.0, 1.0));
         let xs = s.intersects(&r);
         assert_eq!(xs.len(), 0);
 
         // a ray originates inside a sphere
-        let r = Ray::new(Tuple::point(0.0, 0.0, 0.0), Tuple::vector(0.0, 0.0, 1.0));
+        let r = Ray::new(pt(0.0, 0.0, 0.0), v(0.0, 0.0, 1.0));
         let xs = s.intersects(&r);
         assert_eq!(xs.len(), 2);
         assert_eq!(xs[0].t, -1.0);
         assert_eq!(xs[1].t, 1.0);
 
         // a sphere is behind a ray
-        let r = Ray::new(Tuple::point(0.0, 0.0, 5.0), Tuple::vector(0.0, 0.0, 1.0));
+        let r = Ray::new(pt(0.0, 0.0, 5.0), v(0.0, 0.0, 1.0));
         let xs = s.intersects(&r);
         assert_eq!(xs.len(), 2);
         assert_eq!(xs[0].t, -6.0);
@@ -288,13 +345,13 @@ mod tests {
     #[test]
     fn intersection() {
         // an intersection encapsulates t and object
-        let s = Sphere::new(None, None);
+        let s = sphere();
         let i = Intersection::new(3.5, s);
         assert_eq!(3.5, i.t);
         // assert_eq!(i.object, s);
 
         // aggregate intersections
-        let s = Sphere::new(None, None);
+        let s = sphere();
         let i1 = Intersection::new(1.0, s.clone());
         let i2 = Intersection::new(2.0, s);
         let mut xs = [i1, i2];
@@ -304,7 +361,7 @@ mod tests {
         assert_eq!(xs[1].t, 2.0);
 
         // the hit when all intersections have positive t
-        let s = Sphere::new(None, None);
+        let s = sphere();
         let i1 = Intersection::new(1.0, s.clone());
         let i2 = Intersection::new(2.0, s.clone());
         let mut xs = vec![i2, i1];
@@ -342,43 +399,72 @@ mod tests {
     #[test]
     fn ray_translation() {
         // translating a ray
-        let r = Ray::new(Tuple::point(1.0, 2.0, 3.0), Tuple::vector(0.0, 1.0, 0.0));
+        let r = Ray::new(pt(1.0, 2.0, 3.0), v(0.0, 1.0, 0.0));
         let m = Matrix4x4::translation(3.0, 4.0, 5.0);
         let r2 = r.transform(m);
-        assert_eq!(r2.origin, Tuple::point(4.0, 6.0, 8.0));
-        assert_eq!(r2.direction, Tuple::vector(0.0, 1.0, 0.0));
+        assert_eq!(r2.origin, pt(4.0, 6.0, 8.0));
+        assert_eq!(r2.direction, v(0.0, 1.0, 0.0));
 
         // scaling a ray
         let m = Matrix4x4::scaling(2.0, 3.0, 4.0);
         let r2 = r.transform(m);
-        assert_eq!(r2.origin, Tuple::point(2.0, 6.0, 12.0));
-        assert_eq!(r2.direction, Tuple::vector(0.0, 3.0, 0.0));
+        assert_eq!(r2.origin, pt(2.0, 6.0, 12.0));
+        assert_eq!(r2.direction, v(0.0, 3.0, 0.0));
     }
 
     #[test]
-    fn sphere_transformation() {
-        // a sphere's default transformation
-        let mut s = Sphere::new(None, None);
+    fn shape_operations() {
+        // the default transformation
+        let mut s = test_shape();
         assert_eq!(s.transform, Matrix4x4::identity());
 
-        // changing a sphere's transformation
+        // assigning a transformation
         let t = Matrix4x4::translation(2.0, 3.0, 4.0);
         s.transform = t;
         assert_eq!(s.transform, t);
+
+        // the default material
+        assert_eq!(s.material, Material::new());
+
+        // assigning a material
+        let mut m = Material::new();
+        m.ambient = 1.0;
+        s.material = m;
+        assert_eq!(s.material, m);
+
+        // intersecting a scaled shape with a ray
+        let r = Ray::new(pt(0.0, 0.0, -5.0), v(0.0, 0.0, 1.0));
+        let mut s = test_shape();
+        s.transform = Matrix4x4::scaling(2.0, 2.0, 2.0);
+        unsafe {
+            SAVED_RAY = None;
+            s.intersects(&r);
+            assert_eq!(SAVED_RAY.unwrap().origin, pt(0.0, 0.0, -2.5));
+            assert_eq!(SAVED_RAY.unwrap().direction, v(0.0, 0.0, 0.5));
+        };
+
+        // intersecting a translated shape with a ray
+        s.transform = Matrix4x4::translation(5.0, 0.0, 0.0);
+        unsafe {
+            SAVED_RAY = None;
+            s.intersects(&r);
+            assert_eq!(SAVED_RAY.unwrap().origin, pt(-5.0, 0.0, -5.0));
+            assert_eq!(SAVED_RAY.unwrap().direction, v(0.0, 0.0, 1.0));
+        };
     }
 
     #[test]
     fn ray_intersection_with_scaled_sphere() {
         // intersecting a scaled sphere with a ray
-        let r = Ray::new(Tuple::point(0.0, 0.0, -5.0), Tuple::vector(0.0, 0.0, 1.0));
-        let s = Sphere::new(Some(Matrix4x4::scaling(2.0, 2.0, 2.0)), None);
+        let r = Ray::new(pt(0.0, 0.0, -5.0), v(0.0, 0.0, 1.0));
+        let s = spheret(Matrix4x4::scaling(2.0, 2.0, 2.0));
         let xs = s.intersects(&r);
         assert_eq!(xs.len(), 2);
         assert_eq!(xs[0].t, 3.0);
         assert_eq!(xs[1].t, 7.0);
 
         // intersecting a translated sphere with a ray
-        let s = Sphere::new(Some(Matrix4x4::translation(5.0, 0.0, 0.0)), None);
+        let s = spheret(Matrix4x4::translation(5.0, 0.0, 0.0));
         let xs = s.intersects(&r);
         assert_eq!(xs.len(), 0);
     }
@@ -386,27 +472,27 @@ mod tests {
     #[test]
     fn sphere_normal_at() {
         // the normal on a sphere at a point on the x axis
-        let s = Sphere::new(None, None);
-        let n = s.normal_at(Tuple::point(1.0, 0.0, 0.0));
-        assert_eq!(n, Tuple::vector(1.0, 0.0, 0.0));
+        let s = sphere();
+        let n = s.normal_at(pt(1.0, 0.0, 0.0));
+        assert_eq!(n, v(1.0, 0.0, 0.0));
 
         // the normal on a sphere at a point on the y axis
-        let n = s.normal_at(Tuple::point(0.0, 1.0, 0.0));
-        assert_eq!(n, Tuple::vector(0.0, 1.0, 0.0));
+        let n = s.normal_at(pt(0.0, 1.0, 0.0));
+        assert_eq!(n, v(0.0, 1.0, 0.0));
 
         // the normal on a sphere at a point on the y axis
-        let n = s.normal_at(Tuple::point(0.0, 0.0, 1.0));
-        assert_eq!(n, Tuple::vector(0.0, 0.0, 1.0));
+        let n = s.normal_at(pt(0.0, 0.0, 1.0));
+        assert_eq!(n, v(0.0, 0.0, 1.0));
 
         // the normal on a sphere at a point on a nonaxial point
-        let n = s.normal_at(Tuple::point(
+        let n = s.normal_at(pt(
             3.0_f64.sqrt() / 3.0,
             3.0_f64.sqrt() / 3.0,
             3.0_f64.sqrt() / 3.0,
         ));
         assert_eq!(
             n,
-            Tuple::vector(
+            v(
                 3.0_f64.sqrt() / 3.0,
                 3.0_f64.sqrt() / 3.0,
                 3.0_f64.sqrt() / 3.0
@@ -418,26 +504,25 @@ mod tests {
     }
 
     #[test]
-    fn sphere_transformed_normal() {
-        // computing the normal on a translated sphere
-        let s = Sphere::new(Some(Matrix4x4::translation(0.0, 1.0, 0.0)), None);
-        let n = s.normal_at(Tuple::point(0.0, 1.70711, -0.70711));
-        assert_eq!(n, Tuple::vector(0.0, 0.70711, -0.70711));
+    fn shape_transformed_normal() {
+        // computing the normal on a translated shape
+        let mut s = test_shape();
+        s.transform = Matrix4x4::translation(0.0, 1.0, 0.0);
+        let n = s.normal_at(pt(0.0, 1.70711, -0.70711));
+        assert_eq!(n, v(0.0, 0.70711, -0.70711));
 
-        // computing the normal on a transformed sphere
-        let s = Sphere::new(
-            Some(Matrix4x4::scaling(1.0, 0.5, 1.0) * Matrix4x4::rotation_z(PI / 5.0)),
-            None,
-        );
-        let n = s.normal_at(Tuple::point(0.0, 2.0_f64 / 2.0, -2.0_f64 / 2.0));
-        assert_eq!(n, Tuple::vector(0.0, 0.97014, -0.24254));
+        // computing the normal on a transformed shape
+        let mut s = test_shape();
+        s.transform = Matrix4x4::scaling(1.0, 0.5, 1.0) * Matrix4x4::rotation_z(PI / 5.0);
+        let n = s.normal_at(pt(0.0, 2.0_f64 / 2.0, -2.0_f64 / 2.0));
+        assert_eq!(n, v(0.0, 0.97014, -0.24254));
     }
 
     #[test]
     fn point_light() {
         // a point light has a position and an intensity
         let intensity = Color::new(1.0, 1.0, 1.0);
-        let position = Tuple::point(0.0, 0.0, 0.0);
+        let position = pt(0.0, 0.0, 0.0);
         let light = PointLight::new(position, intensity);
         assert_eq!(light.position, position);
         assert_eq!(light.intensity, intensity);
@@ -454,30 +539,15 @@ mod tests {
     }
 
     #[test]
-    fn sphere_material() {
-        // a sphere has a default material
-        let s = Sphere::new(None, None);
-        let m = s.material;
-        assert_eq!(m, Material::new());
-
-        // a sphere may be assigned a material
-        let mut s = Sphere::new(None, None);
-        let mut m = Material::new();
-        m.ambient = 1.0;
-        s.material = m;
-        assert_eq!(s.material, m);
-    }
-
-    #[test]
     fn lighting() {
         let m = Material::new();
-        let position = Tuple::point(0.0, 0.0, 0.0);
+        let position = pt(0.0, 0.0, 0.0);
 
         // lighting with the eye between the light and the surface
         // ambient, diffuse, and specular all at full strength
-        let eyev = Tuple::vector(0.0, 0.0, -1.0);
-        let normalv = Tuple::vector(0.0, 0.0, -1.0);
-        let light = PointLight::new(Tuple::point(0.0, 0.0, -10.0), Color::new(1.0, 1.0, 1.0));
+        let eyev = v(0.0, 0.0, -1.0);
+        let normalv = v(0.0, 0.0, -1.0);
+        let light = PointLight::new(pt(0.0, 0.0, -10.0), Color::new(1.0, 1.0, 1.0));
         let result = m.lighting(&light, &position, &eyev, &normalv, false);
         assert_eq!(result, Color::new(1.9, 1.9, 1.9));
 
@@ -489,20 +559,20 @@ mod tests {
         // lighting with the eye between light and surface, eye offset 45 degrees
         // ambient and diffuse unchanged because the angle between them is unchanged
         // specular drops off to effectively zero
-        let eyev = Tuple::vector(0.0, 2.0_f64.sqrt() / 2.0, 2.0_f64.sqrt() / 2.0);
+        let eyev = v(0.0, 2.0_f64.sqrt() / 2.0, 2.0_f64.sqrt() / 2.0);
         let result = m.lighting(&light, &position, &eyev, &normalv, false);
         assert_eq!(result, Color::new(1.0, 1.0, 1.0));
 
         // lighting with eye opposite surface, light offset 45 degrees
-        let eyev = Tuple::vector(0.0, 0.0, -1.0);
-        let light = PointLight::new(Tuple::point(0.0, 10.0, -10.0), Color::new(1.0, 1.0, 1.0));
+        let eyev = v(0.0, 0.0, -1.0);
+        let light = PointLight::new(pt(0.0, 10.0, -10.0), Color::new(1.0, 1.0, 1.0));
         let result = m.lighting(&light, &position, &eyev, &normalv, false);
         assert_eq!(result, Color::new(0.7364, 0.7364, 0.7364));
 
         // lighting with eye in the path of the reflection vector
         // makes specular at full strength with ambient and diffuse same as last test
-        let eyev = Tuple::vector(0.0, -2.0_f64.sqrt() / 2.0, -2.0_f64.sqrt() / 2.0);
-        let light = PointLight::new(Tuple::point(0.0, 10.0, -10.0), Color::new(1.0, 1.0, 1.0));
+        let eyev = v(0.0, -2.0_f64.sqrt() / 2.0, -2.0_f64.sqrt() / 2.0);
+        let light = PointLight::new(pt(0.0, 10.0, -10.0), Color::new(1.0, 1.0, 1.0));
         let result = m.lighting(&light, &position, &eyev, &normalv, false);
         assert_eq!(result, Color::new(1.6364, 1.6364, 1.6364,));
 
@@ -510,8 +580,8 @@ mod tests {
         // Since the light doesn't illuminate the surface, the diffuse and specular
         // components go to zero.
         // The total intensity should be the same as the ambient component
-        let eyev = Tuple::vector(0.0, 0.0, -1.0);
-        let light = PointLight::new(Tuple::point(0.0, 0.0, 10.0), Color::new(1.0, 1.0, 1.0));
+        let eyev = v(0.0, 0.0, -1.0);
+        let light = PointLight::new(pt(0.0, 0.0, 10.0), Color::new(1.0, 1.0, 1.0));
         let result = m.lighting(&light, &position, &eyev, &normalv, false);
         assert_eq!(result, Color::new(0.1, 0.1, 0.1));
     }
@@ -519,27 +589,27 @@ mod tests {
     #[test]
     fn intersection_precomputation() {
         // precomputing the state of an interesection
-        let r = Ray::new(Tuple::point(0.0, 0.0, -5.0), Tuple::vector(0.0, 0.0, 1.0));
-        let shape = Sphere::new(None, None);
+        let r = Ray::new(pt(0.0, 0.0, -5.0), v(0.0, 0.0, 1.0));
+        let shape = sphere();
         let i = Intersection::new(4.0, shape);
         let comps = i.prepare_computations(&r);
         assert_eq!(comps.t, i.t);
-        assert_eq!(comps.point, Tuple::point(0.0, 0.0, -1.0));
-        assert_eq!(comps.eyev, Tuple::vector(0.0, 0.0, -1.0));
-        assert_eq!(comps.normalv, Tuple::vector(0.0, 0.0, -1.0));
+        assert_eq!(comps.point, pt(0.0, 0.0, -1.0));
+        assert_eq!(comps.eyev, v(0.0, 0.0, -1.0));
+        assert_eq!(comps.normalv, v(0.0, 0.0, -1.0));
 
         // the hit, when an intersection occurs on the outside
         assert_eq!(comps.inside, false);
 
         // the hit, when an intersection occurs on the inside
-        let r = Ray::new(Tuple::point(0.0, 0.0, 0.0), Tuple::vector(0.0, 0.0, 1.0));
+        let r = Ray::new(pt(0.0, 0.0, 0.0), v(0.0, 0.0, 1.0));
         let i = Intersection::new(1.0, shape);
         let comps = i.prepare_computations(&r);
         assert_eq!(comps.t, i.t);
-        assert_eq!(comps.point, Tuple::point(0.0, 0.0, 1.0));
-        assert_eq!(comps.eyev, Tuple::vector(0.0, 0.0, -1.0));
+        assert_eq!(comps.point, pt(0.0, 0.0, 1.0));
+        assert_eq!(comps.eyev, v(0.0, 0.0, -1.0));
         assert_eq!(comps.inside, true);
         // normal would have been (0.0, 0.0, 1.0), but is inverted!
-        assert_eq!(comps.normalv, Tuple::vector(0.0, 0.0, -1.0));
+        assert_eq!(comps.normalv, v(0.0, 0.0, -1.0));
     }
 }

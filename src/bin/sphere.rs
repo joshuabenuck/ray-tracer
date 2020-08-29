@@ -1,5 +1,5 @@
 use ray_tracer::{
-    Canvas, Color, Intersections, Material, Matrix4x4, PointLight, Ray, Sphere, Tuple,
+    spheretm, Canvas, Color, Intersections, Material, Matrix4x4, PointLight, Ray, Tuple,
 };
 
 fn main() -> Result<(), std::io::Error> {
@@ -24,7 +24,7 @@ fn main() -> Result<(), std::io::Error> {
 
     let mut material = Material::new();
     material.color = Color::new(1.0, 0.2, 1.0);
-    let shape = Sphere::new(Some(transform), Some(material));
+    let shape = spheretm(transform, material);
     let light_position = Tuple::point(-10.0, 10.0, -10.0);
     let light_color = Color::new(1.0, 1.0, 1.0);
     let light = PointLight::new(light_position, light_color);

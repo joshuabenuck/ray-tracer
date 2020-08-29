@@ -1,5 +1,5 @@
 use ray_tracer::{
-    pt, v, view_transform, Camera, Canvas, Color, Material, Matrix4x4, PointLight, Sphere, World,
+    pt, spheretm, v, view_transform, Camera, Color, Material, Matrix4x4, PointLight, World,
 };
 use std::f64::consts::PI;
 
@@ -8,33 +8,33 @@ fn main() -> Result<(), std::io::Error> {
     let mut material = Material::new();
     material.color = Color::new(1.0, 0.9, 0.9);
     material.specular = 0.0;
-    let floor = Sphere::new(Some(transform), Some(material));
+    let floor = spheretm(transform, material);
 
     let transform = Matrix4x4::translation(0.0, 0.0, 5.0)
         * Matrix4x4::rotation_y(-PI / 4.0)
         * Matrix4x4::rotation_x(PI / 2.0)
         * Matrix4x4::scaling(10.0, 0.01, 10.0);
-    let left_wall = Sphere::new(Some(transform), Some(material));
+    let left_wall = spheretm(transform, material);
 
     let transform = Matrix4x4::translation(0.0, 0.0, 5.0)
         * Matrix4x4::rotation_y(PI / 4.0)
         * Matrix4x4::rotation_x(PI / 2.0)
         * Matrix4x4::scaling(10.0, 0.01, 10.0);
-    let right_wall = Sphere::new(Some(transform), Some(material));
+    let right_wall = spheretm(transform, material);
 
     let transform = Matrix4x4::translation(-0.5, 1.0, 0.5);
     let mut material = Material::new();
     material.color = Color::new(0.1, 1.0, 0.5);
     material.diffuse = 0.7;
     material.specular = 0.3;
-    let middle = Sphere::new(Some(transform), Some(material));
+    let middle = spheretm(transform, material);
 
     let transform = Matrix4x4::translation(1.5, 0.50, -0.50) * Matrix4x4::scaling(0.5, 0.5, 0.5);
     let mut material = Material::new();
     material.color = Color::new(-0.5, 1.0, 0.1);
     material.diffuse = 0.7;
     material.specular = 0.3;
-    let right = Sphere::new(Some(transform), Some(material));
+    let right = spheretm(transform, material);
 
     let transform =
         Matrix4x4::translation(-1.5, 0.33, -0.75) * Matrix4x4::scaling(0.33, 0.33, 0.33);
@@ -42,7 +42,7 @@ fn main() -> Result<(), std::io::Error> {
     material.color = Color::new(1.0, 0.8, 0.1);
     material.diffuse = 0.7;
     material.specular = 0.3;
-    let left = Sphere::new(Some(transform), Some(material));
+    let left = spheretm(transform, material);
 
     let mut world = World::empty();
     world.lights.push(PointLight::new(

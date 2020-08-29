@@ -1,10 +1,10 @@
 use crate::{
-    pt, v, Canvas, Color, Comps, Intersection, Intersections, Material, Matrix4x4, PointLight, Ray,
-    Sphere, Tuple,
+    pt, sphere, spherem, spheret, spheretm, v, Canvas, Color, Comps, Intersection, Intersections,
+    Material, Matrix4x4, PointLight, Ray, Shape, Tuple,
 };
 
 pub struct World {
-    pub objects: Vec<Sphere>,
+    pub objects: Vec<Shape>,
     pub lights: Vec<PointLight>,
 }
 
@@ -79,9 +79,9 @@ impl Default for World {
         material.diffuse = 0.7;
         material.specular = 0.2;
         // outer
-        let s1 = Sphere::new(None, Some(material));
+        let s1 = spherem(material);
         // inner
-        let s2 = Sphere::new(Some(Matrix4x4::scaling(0.5, 0.5, 0.5)), None);
+        let s2 = spheret(Matrix4x4::scaling(0.5, 0.5, 0.5));
         World {
             objects: vec![s1, s2],
             lights: vec![light],
@@ -196,8 +196,8 @@ mod tests {
         material.color = Color::new(0.8, 1.0, 0.6);
         material.diffuse = 0.7;
         material.specular = 0.2;
-        let s1 = Sphere::new(None, Some(material));
-        let s2 = Sphere::new(Some(Matrix4x4::scaling(0.5, 0.5, 0.5)), None);
+        let s1 = spherem(material);
+        let s2 = spheret(Matrix4x4::scaling(0.5, 0.5, 0.5));
         let w = World::default();
         assert_eq!(w.lights[0], light);
         assert_eq!(w.objects.contains(&s1), true);
@@ -397,9 +397,9 @@ mod tests {
             pt(0.0, 0.0, -10.0),
             Color::new(1.0, 1.0, 1.0),
         ));
-        let s1 = Sphere::new(None, None);
+        let s1 = sphere();
         let transform = Matrix4x4::translation(0.0, 0.0, 10.0);
-        let s2 = Sphere::new(Some(transform), None);
+        let s2 = spheret(transform);
         w.objects.append(&mut vec![s1, s2]);
         let r = Ray::new(pt(0.0, 0.0, 5.0), v(0.0, 0.0, 1.0));
         let i = Intersection::new(4.0, s2);
@@ -413,7 +413,7 @@ mod tests {
         // the hit should offset the point
         let r = Ray::new(pt(0.0, 0.0, -5.0), v(0.0, 0.0, 1.0));
         let transform = Matrix4x4::translation(0.0, 0.0, 1.0);
-        let shape = Sphere::new(Some(transform), None);
+        let shape = spheret(transform);
         let i = Intersection::new(5.0, shape);
         let comps = i.prepare_computations(&r);
         // compares over_point's z component to half of -EPISLON to make sure
