@@ -6,12 +6,13 @@ pub enum PatternDesign {
     Gradient(Color, Color),
     Ring(Color, Color),
     Checkers(Color, Color),
+    Test,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Pattern {
-    design: PatternDesign,
-    transform: Matrix4x4,
+    pub design: PatternDesign,
+    pub transform: Matrix4x4,
 }
 
 impl Pattern {
@@ -49,6 +50,7 @@ impl Pattern {
                     b
                 }
             }
+            PatternDesign::Test => Color::new(point.x, point.y, point.z),
         }
     }
 
@@ -94,10 +96,42 @@ pub fn checkers_pattern(a: Color, b: Color) -> Pattern {
     }
 }
 
+pub fn test_pattern() -> Pattern {
+    Pattern {
+        design: PatternDesign::Test,
+        transform: Matrix4x4::identity(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{black, pt, sphere, spheret, white, Matrix4x4};
+
+    #[test]
+    fn pattern_default() {
+        // the default pattern transformation
+        let mut pattern = test_pattern();
+        assert_eq!(pattern.transform, Matrix4x4::identity());
+
+        // assigning a transformation
+        pattern.transform = Matrix4x4::translation(1.0, 2.0, 3.0);
+        assert_eq!(pattern.transform, Matrix4x4::translation(1.0, 2.0, 3.0));
+
+        // a pattern with an object transformation
+        let shape = spheret(Matrix4x4::scaling(2.0, 2.0, 2.0));
+        let pattern = test_pattern();
+        let c = pattern.pattern_at_object(shape, pt(2.0, 3.0, 4.0));
+        assert_eq!(c, Color::new(1.0, 1.5, 2.0));
+
+        // a pattern with a pattern transformation
+        let mut shape = sphere();
+        shape.transform = Matrix4x4::scaling(2.0, 2.0, 2.0);
+        let mut pattern = test_pattern();
+        pattern.transform = Matrix4x4::translation(0.5, 1.0, 1.5);
+        let c = pattern.pattern_at_object(shape, pt(2.5, 3.0, 3.5));
+        assert_eq!(c, Color::new(0.75, 0.5, 0.25));
+    }
 
     #[test]
     fn pattern_stripe() {

@@ -1,4 +1,4 @@
-use crate::Tuple;
+use crate::{equal, Tuple};
 use std::ops::{Index, IndexMut, Mul};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -250,12 +250,6 @@ impl Matrix4x4 {
         let sub = self.submatrix(row, column);
         sub.determinant()
     }
-}
-
-const EPSILON: f64 = 0.00001;
-
-fn equal(a: f64, b: f64) -> bool {
-    f64::abs(a - b) < EPSILON
 }
 
 impl PartialEq for Matrix4x4 {
