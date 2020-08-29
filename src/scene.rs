@@ -28,6 +28,7 @@ impl World {
     pub fn shade_hit(&self, comps: &Comps) -> Color {
         let mut cs = self.lights.iter().map(|l| {
             comps.object.material.lighting(
+                &comps.object,
                 &l,
                 &comps.point,
                 &comps.eyev,

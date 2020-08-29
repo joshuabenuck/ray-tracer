@@ -188,6 +188,14 @@ impl Div<f64> for Tuple {
     }
 }
 
+pub fn black() -> Color {
+    Color::new(0.0, 0.0, 0.0)
+}
+
+pub fn white() -> Color {
+    Color::new(1.0, 1.0, 1.0)
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct Color {
     red: f64,

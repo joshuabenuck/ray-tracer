@@ -1,4 +1,4 @@
-use crate::{pt, v, Color, Matrix4x4, Tuple, EPSILON};
+use crate::{pt, v, Color, Matrix4x4, Pattern, Tuple, EPSILON};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Ray {
@@ -249,6 +249,7 @@ impl PointLight {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Material {
     pub color: Color,
+    pub pattern: Option<Pattern>,
     pub ambient: f64,
     pub diffuse: f64,
     pub specular: f64,
@@ -259,6 +260,7 @@ impl Material {
     pub fn new() -> Material {
         Material {
             color: Color::new(1.0, 1.0, 1.0),
+            pattern: None,
             ambient: 0.1,
             diffuse: 0.9,
             specular: 0.9,
@@ -268,14 +270,20 @@ impl Material {
 
     pub fn lighting(
         &self,
+        object: &Shape,
         light: &PointLight,
         point: &Tuple,
         eyev: &Tuple,
         normalv: &Tuple,
         in_shadow: bool,
     ) -> Color {
+        let color = if let Some(pattern) = self.pattern {
+            pattern.stripe_at_object(*object, *point)
+        } else {
+            self.color
+        };
         // combine the surface color with the light's color / intensity
-        let effective_color = self.color * light.intensity;
+        let effective_color = color * light.intensity;
 
         // find the direction to the light source
         let lightv = (light.position - *point).normalize();
@@ -318,6 +326,7 @@ impl Material {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{black, stripe_pattern, white};
     use std::f64::consts::PI;
 
     #[test]
@@ -625,32 +634,32 @@ mod tests {
         let eyev = v(0.0, 0.0, -1.0);
         let normalv = v(0.0, 0.0, -1.0);
         let light = PointLight::new(pt(0.0, 0.0, -10.0), Color::new(1.0, 1.0, 1.0));
-        let result = m.lighting(&light, &position, &eyev, &normalv, false);
+        let result = m.lighting(&sphere(), &light, &position, &eyev, &normalv, false);
         assert_eq!(result, Color::new(1.9, 1.9, 1.9));
 
         // lighting with the surface in shadow
         let in_shadow = true;
-        let result = m.lighting(&light, &position, &eyev, &normalv, in_shadow);
+        let result = m.lighting(&sphere(), &light, &position, &eyev, &normalv, in_shadow);
         assert_eq!(result, Color::new(0.1, 0.1, 0.1));
 
         // lighting with the eye between light and surface, eye offset 45 degrees
         // ambient and diffuse unchanged because the angle between them is unchanged
         // specular drops off to effectively zero
         let eyev = v(0.0, 2.0_f64.sqrt() / 2.0, 2.0_f64.sqrt() / 2.0);
-        let result = m.lighting(&light, &position, &eyev, &normalv, false);
+        let result = m.lighting(&sphere(), &light, &position, &eyev, &normalv, false);
         assert_eq!(result, Color::new(1.0, 1.0, 1.0));
 
         // lighting with eye opposite surface, light offset 45 degrees
         let eyev = v(0.0, 0.0, -1.0);
         let light = PointLight::new(pt(0.0, 10.0, -10.0), Color::new(1.0, 1.0, 1.0));
-        let result = m.lighting(&light, &position, &eyev, &normalv, false);
+        let result = m.lighting(&sphere(), &light, &position, &eyev, &normalv, false);
         assert_eq!(result, Color::new(0.7364, 0.7364, 0.7364));
 
         // lighting with eye in the path of the reflection vector
         // makes specular at full strength with ambient and diffuse same as last test
         let eyev = v(0.0, -2.0_f64.sqrt() / 2.0, -2.0_f64.sqrt() / 2.0);
         let light = PointLight::new(pt(0.0, 10.0, -10.0), Color::new(1.0, 1.0, 1.0));
-        let result = m.lighting(&light, &position, &eyev, &normalv, false);
+        let result = m.lighting(&sphere(), &light, &position, &eyev, &normalv, false);
         assert_eq!(result, Color::new(1.6364, 1.6364, 1.6364,));
 
         // light with the light behind the surface
@@ -659,8 +668,39 @@ mod tests {
         // The total intensity should be the same as the ambient component
         let eyev = v(0.0, 0.0, -1.0);
         let light = PointLight::new(pt(0.0, 0.0, 10.0), Color::new(1.0, 1.0, 1.0));
-        let result = m.lighting(&light, &position, &eyev, &normalv, false);
+        let result = m.lighting(&sphere(), &light, &position, &eyev, &normalv, false);
         assert_eq!(result, Color::new(0.1, 0.1, 0.1));
+    }
+
+    #[test]
+    fn lighting_with_pattern() {
+        // lighting with a pattern applied
+        let mut m = Material::new();
+        m.pattern = Some(stripe_pattern(white(), black()));
+        m.ambient = 1.0;
+        m.diffuse = 0.0;
+        m.specular = 0.0;
+        let eyev = v(0.0, 0.0, -1.0);
+        let normalv = v(0.0, 0.0, -1.0);
+        let light = PointLight::new(pt(0.0, 0.0, -10.0), white());
+        let c1 = m.lighting(
+            &sphere(),
+            &light,
+            &pt(0.9, 0.0, 0.0),
+            &eyev,
+            &normalv,
+            false,
+        );
+        let c2 = m.lighting(
+            &sphere(),
+            &light,
+            &pt(1.1, 0.0, 0.0),
+            &eyev,
+            &normalv,
+            false,
+        );
+        assert_eq!(c1, white());
+        assert_eq!(c2, black());
     }
 
     #[test]

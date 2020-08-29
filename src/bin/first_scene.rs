@@ -1,11 +1,17 @@
 use ray_tracer::{
-    planem, pt, spheretm, v, view_transform, Camera, Color, Material, Matrix4x4, PointLight, World,
+    planem, pt, spheretm, stripe_pattern, v, view_transform, Camera, Color, Material, Matrix4x4,
+    PointLight, World,
 };
 use std::f64::consts::PI;
 
 fn main() -> Result<(), std::io::Error> {
     let mut material = Material::new();
     material.color = Color::new(1.0, 0.9, 0.9);
+    let pattern = Some(stripe_pattern(
+        Color::new(1.0, 1.0, 1.0),
+        Color::new(0.6, 0.0, 0.4),
+    ));
+    material.pattern = pattern;
     material.specular = 0.0;
     let floor = planem(material);
 
@@ -24,6 +30,7 @@ fn main() -> Result<(), std::io::Error> {
     let transform = Matrix4x4::translation(-0.5, 1.0, 0.5);
     let mut material = Material::new();
     material.color = Color::new(0.1, 1.0, 0.5);
+    material.pattern = pattern;
     material.diffuse = 0.7;
     material.specular = 0.3;
     let middle = spheretm(transform, material);
@@ -31,6 +38,7 @@ fn main() -> Result<(), std::io::Error> {
     let transform = Matrix4x4::translation(1.5, 0.50, -0.50) * Matrix4x4::scaling(0.5, 0.5, 0.5);
     let mut material = Material::new();
     material.color = Color::new(-0.5, 1.0, 0.1);
+    material.pattern = pattern;
     material.diffuse = 0.7;
     material.specular = 0.3;
     let right = spheretm(transform, material);
@@ -39,6 +47,7 @@ fn main() -> Result<(), std::io::Error> {
         Matrix4x4::translation(-1.5, 0.33, -0.75) * Matrix4x4::scaling(0.33, 0.33, 0.33);
     let mut material = Material::new();
     material.color = Color::new(1.0, 0.8, 0.1);
+    material.pattern = pattern;
     material.diffuse = 0.7;
     material.specular = 0.3;
     let left = spheretm(transform, material);
