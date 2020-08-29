@@ -1,26 +1,25 @@
 use ray_tracer::{
-    pt, spheretm, v, view_transform, Camera, Color, Material, Matrix4x4, PointLight, World,
+    planem, pt, spheretm, v, view_transform, Camera, Color, Material, Matrix4x4, PointLight, World,
 };
 use std::f64::consts::PI;
 
 fn main() -> Result<(), std::io::Error> {
-    let transform = Matrix4x4::scaling(10.0, 0.01, 10.0);
     let mut material = Material::new();
     material.color = Color::new(1.0, 0.9, 0.9);
     material.specular = 0.0;
-    let floor = spheretm(transform, material);
+    let floor = planem(material);
 
-    let transform = Matrix4x4::translation(0.0, 0.0, 5.0)
-        * Matrix4x4::rotation_y(-PI / 4.0)
-        * Matrix4x4::rotation_x(PI / 2.0)
-        * Matrix4x4::scaling(10.0, 0.01, 10.0);
-    let left_wall = spheretm(transform, material);
+    // let transform = Matrix4x4::translation(0.0, 0.0, 5.0)
+    //     * Matrix4x4::rotation_y(-PI / 4.0)
+    //     * Matrix4x4::rotation_x(PI / 2.0)
+    //     * Matrix4x4::scaling(10.0, 0.01, 10.0);
+    // let left_wall = spheretm(transform, material);
 
-    let transform = Matrix4x4::translation(0.0, 0.0, 5.0)
-        * Matrix4x4::rotation_y(PI / 4.0)
-        * Matrix4x4::rotation_x(PI / 2.0)
-        * Matrix4x4::scaling(10.0, 0.01, 10.0);
-    let right_wall = spheretm(transform, material);
+    // let transform = Matrix4x4::translation(0.0, 0.0, 5.0)
+    //     * Matrix4x4::rotation_y(PI / 4.0)
+    //     * Matrix4x4::rotation_x(PI / 2.0)
+    //     * Matrix4x4::scaling(10.0, 0.01, 10.0);
+    // let right_wall = spheretm(transform, material);
 
     let transform = Matrix4x4::translation(-0.5, 1.0, 0.5);
     let mut material = Material::new();
@@ -49,7 +48,7 @@ fn main() -> Result<(), std::io::Error> {
         pt(-10.0, 10.0, -10.0),
         Color::new(1.0, 1.0, 1.0),
     ));
-    world.objects = vec![floor, left_wall, right_wall, middle, left, right];
+    world.objects = vec![floor, middle, left, right];
 
     let mut camera = Camera::new(400, 200, PI / 3.0);
     camera.transform = view_transform(pt(0.0, 1.5, -5.0), pt(0.0, 1.0, 0.0), v(0.0, 1.0, 0.0));

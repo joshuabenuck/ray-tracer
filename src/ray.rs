@@ -39,11 +39,39 @@ pub struct Shape {
 
 static mut SAVED_RAY: Option<Ray> = None;
 
-pub fn test_shape() -> Shape {
+fn test_shape() -> Shape {
     Shape {
         transform: Matrix4x4::identity(),
         material: Material::new(),
         form: ShapeForm::Test,
+    }
+}
+
+#[inline]
+pub fn plane() -> Shape {
+    Shape {
+        transform: Matrix4x4::identity(),
+        material: Material::new(),
+        form: ShapeForm::Plane,
+    }
+}
+
+#[inline]
+pub fn planet(transform: Matrix4x4) -> Shape {
+    planetm(transform, Material::new())
+}
+
+#[inline]
+pub fn planem(material: Material) -> Shape {
+    planetm(Matrix4x4::identity(), material)
+}
+
+#[inline]
+pub fn planetm(transform: Matrix4x4, material: Material) -> Shape {
+    Shape {
+        material,
+        transform,
+        form: ShapeForm::Plane,
     }
 }
 
@@ -104,7 +132,15 @@ impl Shape {
                     Intersection::new(t2, self.clone()),
                 ]
             }
-            _ => Vec::new(),
+            ShapeForm::Plane => {
+                if ray.direction.y.abs() < EPSILON {
+                    Vec::new()
+                } else {
+                    let t = -ray.origin.y / ray.direction.y;
+                    vec![Intersection::new(t, self.clone())]
+                }
+            }
+            _ => unreachable!(),
         }
     }
 
@@ -124,6 +160,7 @@ impl Shape {
         match self.form {
             ShapeForm::Test => v(local_point.x, local_point.y, local_point.z),
             ShapeForm::Sphere => local_point - pt(0.0, 0.0, 0.0),
+            ShapeForm::Plane => v(0.0, 1.0, 0.0),
             _ => unreachable!(),
         }
     }
@@ -343,6 +380,34 @@ mod tests {
     }
 
     #[test]
+    fn ray_plane_intersection() {
+        // intersect with a ray parallel to the plane
+        let p = plane();
+        let r = Ray::new(pt(0.0, 10.0, 0.0), v(0.0, 0.0, 1.0));
+        let xs = p.local_intersects(&r);
+        assert_eq!(xs.len(), 0);
+
+        // intersect with a coplanar ray
+        let r = Ray::new(pt(0.0, 0.0, 0.0), v(0.0, 0.0, 1.0));
+        let xs = p.local_intersects(&r);
+        assert_eq!(xs.len(), 0);
+
+        // a ray intersecting a plane from above
+        let r = Ray::new(pt(0.0, 1.0, 0.0), v(0.0, -1.0, 0.0));
+        let xs = p.local_intersects(&r);
+        assert_eq!(xs.len(), 1);
+        assert_eq!(xs[0].t, 1.0);
+        assert_eq!(xs[0].object, p);
+
+        // a ray intersection a plane from below
+        let r = Ray::new(pt(0.0, -1.0, 0.0), v(0.0, 1.0, 0.0));
+        let xs = p.local_intersects(&r);
+        assert_eq!(xs.len(), 1);
+        assert_eq!(xs[0].t, 1.0);
+        assert_eq!(xs[0].object, p);
+    }
+
+    #[test]
     fn intersection() {
         // an intersection encapsulates t and object
         let s = sphere();
@@ -501,6 +566,18 @@ mod tests {
 
         // the normal is a normalized vector
         assert_eq!(n, n.normalize());
+    }
+
+    #[test]
+    fn plane_normal_at() {
+        // the normal of a plane is constant everywhere
+        let p = plane();
+        let n1 = p.normal_at(pt(0.0, 0.0, 0.0));
+        let n2 = p.normal_at(pt(10.0, 0.0, -10.0));
+        let n3 = p.normal_at(pt(-5.0, 0.0, 150.0));
+        assert_eq!(n1, v(0.0, 1.0, 0.0));
+        assert_eq!(n2, v(0.0, 1.0, 0.0));
+        assert_eq!(n3, v(0.0, 1.0, 0.0));
     }
 
     #[test]
