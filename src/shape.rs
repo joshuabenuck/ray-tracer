@@ -2,9 +2,10 @@ use crate::{pt, v, Intersection, Material, Matrix4x4, Ray, Tuple, EPSILON};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum ShapeForm {
-    Test,
     Sphere,
     Plane,
+    Cube,
+    Test,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -91,6 +92,47 @@ pub fn glass_spheret(transform: Matrix4x4) -> Shape {
     spheretm(transform, m)
 }
 
+#[inline]
+pub fn cube() -> Shape {
+    cubetm(Matrix4x4::identity(), Material::new())
+}
+
+pub fn cubet(transform: Matrix4x4) -> Shape {
+    cubetm(transform, Material::new())
+}
+
+pub fn cubem(material: Material) -> Shape {
+    cubetm(Matrix4x4::identity(), material)
+}
+
+pub fn cubetm(transform: Matrix4x4, material: Material) -> Shape {
+    Shape {
+        transform,
+        material,
+        form: ShapeForm::Cube,
+    }
+}
+
+fn check_axis(origin: f64, direction: f64) -> (f64, f64) {
+    let tmin_numerator = -1.0 - origin;
+    let tmax_numerator = 1.0 - origin;
+
+    let (mut tmin, mut tmax) = if direction.abs() >= EPSILON {
+        (tmin_numerator / direction, tmax_numerator / direction)
+    } else {
+        (
+            tmin_numerator * std::f64::INFINITY,
+            tmax_numerator * std::f64::INFINITY,
+        )
+    };
+
+    if tmin > tmax {
+        std::mem::swap(&mut tmin, &mut tmax);
+    }
+
+    (tmin, tmax)
+}
+
 impl Shape {
     pub fn intersects(&self, ray: &Ray) -> Vec<Intersection> {
         let ray = ray.transform(self.transform.inverse().unwrap());
@@ -133,6 +175,24 @@ impl Shape {
                     vec![Intersection::new(t, self.clone())]
                 }
             }
+            ShapeForm::Cube => {
+                // How to avoid always doing all of these computations?
+                let (xtmin, xtmax) = check_axis(ray.origin.x, ray.direction.x);
+                let (ytmin, ytmax) = check_axis(ray.origin.y, ray.direction.y);
+                let (ztmin, ztmax) = check_axis(ray.origin.z, ray.direction.z);
+
+                let tmin = xtmin.max(ytmin).max(ztmin);
+                let tmax = xtmax.min(ytmax).min(ztmax);
+
+                if tmin > tmax {
+                    return Vec::new();
+                }
+
+                vec![
+                    Intersection::new(tmin, self.clone()),
+                    Intersection::new(tmax, self.clone()),
+                ]
+            }
         }
     }
 
@@ -153,6 +213,21 @@ impl Shape {
             ShapeForm::Test => v(local_point.x, local_point.y, local_point.z),
             ShapeForm::Sphere => local_point - pt(0.0, 0.0, 0.0),
             ShapeForm::Plane => v(0.0, 1.0, 0.0),
+            ShapeForm::Cube => {
+                let maxc = local_point
+                    .x
+                    .abs()
+                    .max(local_point.y.abs())
+                    .max(local_point.z.abs());
+
+                if maxc == local_point.x.abs() {
+                    v(local_point.x, 0.0, 0.0)
+                } else if maxc == local_point.y.abs() {
+                    v(0.0, local_point.y, 0.0)
+                } else {
+                    v(0.0, 0.0, local_point.z)
+                }
+            }
         }
     }
 }
@@ -311,6 +386,46 @@ mod tests {
     }
 
     #[test]
+    fn ray_intersection_with_cube() {
+        // a ray intersects a cube
+        fn test(origin: Tuple, direction: Tuple, t1: f64, t2: f64) {
+            let c = cube();
+            let r = Ray::new(origin, direction);
+            let xs = c.local_intersects(&r);
+            assert_eq!(xs.len(), 2);
+            assert_eq!(xs[0].t, t1);
+            assert_eq!(xs[1].t, t2);
+        }
+        // +x
+        test(pt(5.0, 0.5, 0.0), v(-1.0, 0.0, 0.0), 4.0, 6.0);
+        // -x
+        test(pt(-5.0, 0.5, 0.0), v(1.0, 0.0, 0.0), 4.0, 6.0);
+        // +y
+        test(pt(0.5, 5.0, 0.0), v(0.0, -1.0, 0.0), 4.0, 6.0);
+        // -y
+        test(pt(0.5, -5.0, 0.0), v(0.0, 1.0, 0.0), 4.0, 6.0);
+        // +z
+        test(pt(0.5, 0.0, 5.0), v(0.0, 0.0, -1.0), 4.0, 6.0);
+        // -z
+        test(pt(0.5, 0.0, -5.0), v(0.0, 0.0, 1.0), 4.0, 6.0);
+        // insidee
+        test(pt(0.0, 0.5, 0.0), v(0.0, 0.0, 1.0), -1.0, 1.0);
+
+        fn test_miss(origin: Tuple, direction: Tuple) {
+            let c = cube();
+            let r = Ray::new(origin, direction);
+            let xs = c.local_intersects(&r);
+            assert_eq!(xs.len(), 0);
+        }
+        test_miss(pt(-2.0, 0.0, 0.0), v(0.2673, 0.5345, 0.8018));
+        test_miss(pt(0.0, -2.0, 0.0), v(0.8018, 0.2673, 0.5345));
+        test_miss(pt(0.0, 0.0, -2.0), v(0.5345, 0.8018, 0.2673));
+        test_miss(pt(2.0, 0.0, 2.0), v(0.0, 0.0, -1.0));
+        test_miss(pt(0.0, 2.0, 2.0), v(0.0, -1.0, 0.0));
+        test_miss(pt(2.0, 0.0, 2.0), v(-1.0, 0.0, 0.0));
+    }
+
+    #[test]
     fn sphere_normal_at() {
         // the normal on a sphere at a point on the x axis
         let s = sphere();
@@ -354,5 +469,25 @@ mod tests {
         assert_eq!(n1, v(0.0, 1.0, 0.0));
         assert_eq!(n2, v(0.0, 1.0, 0.0));
         assert_eq!(n3, v(0.0, 1.0, 0.0));
+    }
+
+    #[test]
+    fn cube_normal_at() {
+        // the normal of the surface of a cube
+        fn test(point: Tuple, normal: Tuple) {
+            let c = cube();
+            let n = c.normal_at(point);
+            assert_eq!(n, normal);
+        }
+
+        test(pt(1.0, 0.5, -0.8), v(1.0, 0.0, 0.0));
+        test(pt(-1.0, -0.2, 0.9), v(-1.0, 0.0, 0.0));
+        test(pt(-0.4, 1.0, -0.1), v(0.0, 1.0, 0.0));
+        test(pt(0.3, -1.0, -0.7), v(0.0, -1.0, 0.0));
+        test(pt(0.6, 0.3, 1.0), v(0.0, 0.0, 1.0));
+        test(pt(0.4, 0.4, -1.0), v(0.0, 0.0, -1.0));
+        // normal at cube's corners
+        test(pt(1.0, 1.0, 1.0), v(1.0, 0.0, 0.0));
+        test(pt(-1.0, -1.0, -1.0), v(-1.0, 0.0, 0.0));
     }
 }
