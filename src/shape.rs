@@ -1,10 +1,11 @@
-use crate::{pt, v, Intersection, Material, Matrix4x4, Ray, Tuple, EPSILON};
+use crate::{equal, pt, v, Intersection, Material, Matrix4x4, Ray, Tuple, EPSILON};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum ShapeForm {
     Sphere,
     Plane,
     Cube,
+    Cylinder(f64, f64, bool),
     Test,
 }
 
@@ -97,19 +98,52 @@ pub fn cube() -> Shape {
     cubetm(Matrix4x4::identity(), Material::new())
 }
 
+#[inline]
 pub fn cubet(transform: Matrix4x4) -> Shape {
     cubetm(transform, Material::new())
 }
 
+#[inline]
 pub fn cubem(material: Material) -> Shape {
     cubetm(Matrix4x4::identity(), material)
 }
 
+#[inline]
 pub fn cubetm(transform: Matrix4x4, material: Material) -> Shape {
     Shape {
         transform,
         material,
         form: ShapeForm::Cube,
+    }
+}
+
+#[inline]
+pub fn cylinder(min: f64, max: f64, closed: bool) -> Shape {
+    cylindertm(Matrix4x4::identity(), Material::new(), min, max, closed)
+}
+
+#[inline]
+pub fn cylindert(transform: Matrix4x4, min: f64, max: f64, closed: bool) -> Shape {
+    cylindertm(transform, Material::new(), min, max, closed)
+}
+
+#[inline]
+pub fn cylinderm(material: Material, min: f64, max: f64, closed: bool) -> Shape {
+    cylindertm(Matrix4x4::identity(), material, min, max, closed)
+}
+
+#[inline]
+pub fn cylindertm(
+    transform: Matrix4x4,
+    material: Material,
+    min: f64,
+    max: f64,
+    closed: bool,
+) -> Shape {
+    Shape {
+        transform,
+        material,
+        form: ShapeForm::Cylinder(min, max, closed),
     }
 }
 
@@ -131,6 +165,42 @@ fn check_axis(origin: f64, direction: f64) -> (f64, f64) {
     }
 
     (tmin, tmax)
+}
+
+// a helper function to reduce duplication
+// checks to see if the intersection at t is within a radius
+// of 1 (the radius of the cylinders) from the x axis
+fn check_cap(ray: &Ray, t: f64) -> bool {
+    let x = ray.origin.x + t * ray.direction.x;
+    let z = ray.origin.z + t * ray.direction.z;
+    x.powi(2) + z.powi(2) <= 1.0
+}
+
+fn intersect_caps(cyl: &Shape, ray: &Ray, xs: &mut Vec<Intersection>) {
+    match cyl.form {
+        ShapeForm::Cylinder(max, min, closed) => {
+            // caps only matter if the cylinder is closed and might
+            // possibly be interesected by the ray.
+            if !closed || equal(ray.direction.y, 0.0) {
+                return;
+            }
+
+            // check for an intersection with the lower end cap by intersecting
+            // the ray with the plane at y = min
+            let t = (min - ray.origin.y) / ray.direction.y;
+            if check_cap(ray, t) {
+                xs.push(Intersection::new(t, cyl.clone()));
+            }
+
+            // check for an intersection with the upper end cap by intersecting
+            // the ray with the plane at y = max
+            let t = (max - ray.origin.y) / ray.direction.y;
+            if check_cap(ray, t) {
+                xs.push(Intersection::new(t, cyl.clone()));
+            }
+        }
+        _ => unreachable!(),
+    }
 }
 
 impl Shape {
@@ -193,6 +263,46 @@ impl Shape {
                     Intersection::new(tmax, self.clone()),
                 ]
             }
+            ShapeForm::Cylinder(min, max, closed) => {
+                let a = ray.direction.x.powi(2) + ray.direction.z.powi(2);
+
+                // ray is parallel to the y axis
+                if equal(a, 0.0) {
+                    let mut xs = Vec::new();
+                    intersect_caps(self, ray, &mut xs);
+                    return xs;
+                }
+
+                let b = 2.0 * ray.origin.x * ray.direction.x + 2.0 * ray.origin.z * ray.direction.z;
+                let c = ray.origin.x.powi(2) + ray.origin.z.powi(2) - 1.0;
+
+                let disc = b.powi(2) - 4.0 * a * c;
+
+                // ray does not intersect the cylinder
+                if disc < 0.0 {
+                    return Vec::new();
+                }
+
+                let mut t0 = (-b - disc.sqrt()) / (2.0 * a);
+                let mut t1 = (-b + disc.sqrt()) / (2.0 * a);
+                if t0 > t1 {
+                    std::mem::swap(&mut t0, &mut t1);
+                }
+
+                let mut xs = Vec::new();
+
+                let y0 = ray.origin.y + t0 * ray.direction.y;
+                if min < y0 && y0 < max {
+                    xs.push(Intersection::new(t0, self.clone()));
+                }
+
+                let y1 = ray.origin.y + t1 * ray.direction.y;
+                if min < y1 && y1 < max {
+                    xs.push(Intersection::new(t1, self.clone()));
+                }
+                intersect_caps(self, ray, &mut xs);
+                xs
+            }
         }
     }
 
@@ -227,6 +337,17 @@ impl Shape {
                 } else {
                     v(0.0, 0.0, local_point.z)
                 }
+            }
+            ShapeForm::Cylinder(min, max, closed) => {
+                // compute the square of the distance from the y axis
+                let dist = local_point.x.powi(2) + local_point.z.powi(2);
+
+                if dist < 1.0 && local_point.y >= max - EPSILON {
+                    return v(0.0, 1.0, 0.0);
+                } else if dist < 1.0 && local_point.y <= min + EPSILON {
+                    return v(0.0, -1.0, 0.0);
+                }
+                v(local_point.x, 0.0, local_point.z)
             }
         }
     }
@@ -426,6 +547,82 @@ mod tests {
     }
 
     #[test]
+    fn ray_intersection_with_cylinder_misses() {
+        // a ray misses a cylinder
+        fn test(scenario: &str, origin: Tuple, direction: Tuple) {
+            let cyl = cylinder(std::f64::NEG_INFINITY, std::f64::INFINITY, false);
+            let direction = direction.normalize();
+            let r = Ray::new(origin, direction);
+            let xs = cyl.local_intersects(&r);
+            assert_eq!(xs.len(), 0, "{}", scenario);
+        }
+        test("one", pt(1.0, 0.0, 0.0), v(0.0, 1.0, 0.0));
+        test("two", pt(0.0, 0.0, 0.0), v(0.0, 1.0, 0.0));
+        test("three", pt(0.0, 0.0, -5.0), v(1.0, 1.0, 1.0));
+    }
+    #[test]
+    fn ray_intersection_with_cylinder_hits() {
+        // a ray strikes a cylinder
+        fn test_hit(scenario: &str, origin: Tuple, direction: Tuple, t0: f64, t1: f64) {
+            let cyl = cylinder(std::f64::NEG_INFINITY, std::f64::INFINITY, false);
+            let direction = direction.normalize();
+            let r = Ray::new(origin, direction);
+            let xs = cyl.local_intersects(&r);
+            assert_eq!(xs.len(), 2, "{}", scenario);
+            assert_eq!(equal(xs[0].t, t0), true, "{}", scenario);
+            assert_eq!(equal(xs[1].t, t1), true, "{}", scenario);
+        }
+        test_hit("one", pt(1.0, 0.0, -5.0), v(0.0, 0.0, 1.0), 5.0, 5.0);
+        test_hit("two", pt(0.0, 0.0, -5.0), v(0.0, 0.0, 1.0), 4.0, 6.0);
+        test_hit(
+            "three",
+            pt(0.5, 0.0, -5.0),
+            v(0.1, 1.0, 1.0),
+            6.80798,
+            7.08872,
+        );
+    }
+
+    #[test]
+    fn ray_intersection_with_cylinder_constrained() {
+        // intersecting a constrained cylinder
+        fn test(scenario: &str, origin: Tuple, direction: Tuple, count: usize) {
+            let cyl = cylinder(1.0, 2.0, false);
+            let direction = direction.normalize();
+            let r = Ray::new(origin, direction);
+            let xs = cyl.local_intersects(&r);
+            assert_eq!(xs.len(), count, "{}", scenario);
+        }
+
+        test("1", pt(0.0, 1.5, 0.0), v(0.1, 1.0, 0.0), 0);
+        test("2", pt(0.0, 3.0, -5.0), v(0.0, 0.0, 1.0), 0);
+        test("3", pt(0.0, 0.0, -5.0), v(0.0, 0.0, 1.0), 0);
+        test("4", pt(0.0, 2.0, -5.0), v(0.0, 0.0, 1.0), 0);
+        test("5", pt(0.0, 1.0, -5.0), v(0.0, 0.0, 1.0), 0);
+        test("6", pt(0.0, 1.5, -2.0), v(0.0, 0.0, 1.0), 2);
+    }
+
+    #[test]
+    fn ray_intersection_with_closed_cylinder() {
+        // intersecting the caps of a closed cylinder
+        fn test(scenario: &str, origin: Tuple, direction: Tuple, count: usize) {
+            let cyl = cylinder(1.0, 2.0, true);
+            let direction = direction.normalize();
+            let r = Ray::new(origin, direction);
+            let xs = cyl.intersects(&r);
+            assert_eq!(xs.len(), count, "{}", scenario);
+        }
+
+        test("1", pt(0.0, 3.0, 0.0), v(0.0, -1.0, 0.0), 2);
+        test("2", pt(0.0, 3.0, -2.0), v(0.0, -1.0, 2.0), 2);
+        // corner case
+        test("3", pt(0.0, 4.0, -2.0), v(0.0, -1.0, 1.0), 2);
+        test("4", pt(0.0, 0.0, -2.0), v(0.0, 1.0, 2.0), 2);
+        // corner case
+        test("5", pt(0.0, -1.0, -2.0), v(0.0, 1.0, 1.0), 2);
+    }
+
+    #[test]
     fn sphere_normal_at() {
         // the normal on a sphere at a point on the x axis
         let s = sphere();
@@ -489,5 +686,36 @@ mod tests {
         // normal at cube's corners
         test(pt(1.0, 1.0, 1.0), v(1.0, 0.0, 0.0));
         test(pt(-1.0, -1.0, -1.0), v(-1.0, 0.0, 0.0));
+    }
+
+    #[test]
+    fn cylinder_normal_at() {
+        // normal vector on a cylinder
+        fn test(point: Tuple, normal: Tuple) {
+            let cyl = cylinder(std::f64::NEG_INFINITY, std::f64::INFINITY, false);
+            let n = cyl.local_normal_at(point);
+            assert_eq!(n, normal);
+        }
+        test(pt(1.0, 0.0, 0.0), v(1.0, 0.0, 0.0));
+        test(pt(0.0, 5.0, -1.0), v(0.0, 0.0, -1.0));
+        test(pt(0.0, -2.0, 1.0), v(0.0, 0.0, 1.0));
+        test(pt(-1.0, 1.0, 0.0), v(-1.0, 0.0, 0.0));
+    }
+
+    #[test]
+    fn cylinder_end_cap_normal_at() {
+        // the normal vector on a cylinder's end caps
+        fn test(point: Tuple, normal: Tuple) {
+            let cyl = cylinder(1.0, 2.0, true);
+            let n = cyl.local_normal_at(point);
+            assert_eq!(n, normal);
+        }
+
+        test(pt(0.0, 1.0, 0.0), v(0.0, -1.0, 0.0));
+        test(pt(0.5, 1.0, 0.0), v(0.0, -1.0, 0.0));
+        test(pt(0.0, 1.0, 0.5), v(0.0, -1.0, 0.0));
+        test(pt(0.0, 2.0, 0.0), v(0.0, 1.0, 0.0));
+        test(pt(0.5, 2.0, 0.0), v(0.0, 1.0, 0.0));
+        test(pt(0.0, 2.0, 0.5), v(0.0, 1.0, 0.0));
     }
 }
