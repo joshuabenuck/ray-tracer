@@ -1,18 +1,25 @@
+mod intersection;
+mod material;
 mod matrix;
 mod pattern;
 mod ray;
 mod scene;
+mod shape;
 mod tuple;
 
+pub use intersection::{schlick, Comps, Intersection, Intersections};
+pub use material::{m, Material};
 pub use matrix::{id, Matrix2x2, Matrix3x3, Matrix4x4};
 pub use pattern::{
-    checkers_pattern, gradient_pattern, ring_pattern, stripe_pattern, test_pattern, Pattern,
+    checkers_pattern, gradient_pattern, ring_pattern, stripe_pattern, stripe_patternt,
+    test_pattern, Pattern,
 };
-pub use ray::{
-    glass_sphere, glass_spheret, m, plane, planem, planet, planetm, schlick, sphere, spherem,
-    spheret, spheretm, Comps, Intersection, Intersections, Material, PointLight, Ray, Shape,
-};
+pub use ray::{PointLight, Ray};
 pub use scene::{view_transform, Camera, World};
+pub use shape::{
+    glass_sphere, glass_spheret, plane, planem, planet, planetm, sphere, spherem, spheret,
+    spheretm, test_shape, Shape,
+};
 pub use tuple::{black, pt, v, white, Canvas, Color, Tuple};
 
 pub const EPSILON: f64 = 0.00001;

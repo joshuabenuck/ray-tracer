@@ -1,6 +1,6 @@
 use crate::{
-    pt, schlick, sphere, spherem, spheret, spheretm, v, Canvas, Color, Comps, Intersection,
-    Intersections, Material, Matrix4x4, PointLight, Ray, Shape, Tuple,
+    pt, schlick, spherem, spheret, Canvas, Color, Comps, Intersection, Intersections, Material,
+    Matrix4x4, PointLight, Ray, Shape, Tuple,
 };
 
 pub struct World {
@@ -238,7 +238,7 @@ impl Camera {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{black, planetm, test_pattern};
+    use crate::{black, planetm, sphere, spheretm, test_pattern, v};
     use std::f64::consts::PI;
 
     fn twosqrttwo() -> f64 {
