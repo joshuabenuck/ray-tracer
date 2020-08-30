@@ -7,7 +7,8 @@ fn main() -> Result<(), std::io::Error> {
     let light = PointLight::new(pt(-4.9, 4.9, -1.0), Color::new(1.0, 1.0, 1.0));
 
     let mut wall_material = Material::new();
-    let mut wall_pattern = stripe_pattern(Color::new(0.45, 0.45, 0.45), Color::new(0.55, 0.55, 0.55));
+    let mut wall_pattern =
+        stripe_pattern(Color::new(0.45, 0.45, 0.45), Color::new(0.55, 0.55, 0.55));
     wall_pattern.transform = Matrix4x4::scaling(0.25, 0.25, 0.25) * Matrix4x4::rotation_y(1.5708);
     wall_material.pattern = Some(wall_pattern);
     wall_material.ambient = 0.0;
@@ -16,7 +17,8 @@ fn main() -> Result<(), std::io::Error> {
     wall_material.reflective = 0.3;
 
     let mut floor_material = Material::new();
-    let floor_pattern = checkers_pattern(Color::new(0.35, 0.35, 0.35), Color::new(0.65, 0.65, 0.65));
+    let floor_pattern =
+        checkers_pattern(Color::new(0.35, 0.35, 0.35), Color::new(0.65, 0.65, 0.65));
     floor_material.pattern = Some(floor_pattern);
     floor_material.specular = 0.0;
     floor_material.reflective = 0.4;
@@ -29,18 +31,86 @@ fn main() -> Result<(), std::io::Error> {
     let ceiling = planetm(Matrix4x4::translation(0.0, 5.0, 0.0), ceiling_material);
 
     let west_wall = planetm(
-        Matrix4x4::rotation_y(1.5708) *
-        Matrix4x4::rotation_z(1.5708) *
-        Matrix4x4::translation(-5.0, 0.0, 0.0)
-        , wall_material);
-    // let east_wall = planetm(Matrix4x4::rotation_y(1.5708) * Matrix4x4::rotation_z(1.5708) * Matrix4x4::translation(5.0, 0.0, 0.0), wall_material);
-    // let north_wall = planetm(Matrix4x4::rotation_y(1.5708) * Matrix4x4::translation(0.0, 0.0, 5.0), wall_material);
-    // let south_wall = planetm(Matrix4x4::rotation_y(1.5708) * Matrix4x4::translation(0.0, 0.0, -5.0), wall_material);
+        // Matrix4x4::rotation_y(1.5708),
+        Matrix4x4::identity()
+            .rotate_y(1.5708)
+            .rotate_z(1.5708)
+            .translate(-5.0, 0.0, 0.0),
+        wall_material,
+    );
+    let east_wall = planetm(
+        // Matrix4x4::rotation_y(1.5708),
+        Matrix4x4::identity()
+            .rotate_y(1.5708)
+            .rotate_z(1.5708)
+            .translate(5.0, 0.0, 0.0),
+        wall_material,
+    );
+    let north_wall = planetm(
+        Matrix4x4::identity()
+            .rotate_x(1.5708)
+            .translate(0.0, 0.0, 5.0),
+        wall_material,
+    );
+    let south_wall = planetm(
+        Matrix4x4::identity()
+            .rotate_x(1.5708)
+            .translate(0.0, 0.0, -5.0),
+        wall_material,
+    );
+
+    // background
+    let sphere1 = spheretm(
+        id().scale(0.4, 0.4, 0.4).translate(4.6, 0.4, 1.0),
+        m().rgb(0.8, 0.5, 0.3).shininess(50.0),
+    );
+    let sphere2 = spheretm(
+        id().scale(0.3, 0.3, 0.3).translate(4.7, 0.3, 0.4),
+        m().rgb(0.9, 0.4, 0.5).shininess(50.0),
+    );
+    let sphere3 = spheretm(
+        id().scale(0.5, 0.5, 0.5).translate(-1.0, 0.5, 4.5),
+        m().rgb(0.4, 0.9, 0.6).shininess(50.0),
+    );
+    let sphere4 = spheretm(
+        id().scale(0.3, 0.3, 0.3).translate(-1.7, 0.3, 4.7),
+        m().rgb(0.4, 0.6, 0.9).shininess(50.0),
+    );
+
+    // foreground
+    let red = spheretm(
+        id().translate(-0.6, 1.0, 0.6),
+        m().rgb(1.0, 0.3, 0.2).specular(0.4).shininess(5.0),
+    );
+    let blue = spheretm(
+        id().scale(0.7, 0.7, 0.7).translate(0.6, 0.7, -0.6),
+        m().rgb(0.0, 0.0, 0.2)
+            .ambient(0.0)
+            .diffuse(0.4)
+            .specular(0.9)
+            .shininess(300.0)
+            .reflective(0.9)
+            .transparency(0.9)
+            .refractive_index(1.5),
+    );
+    let green = spheretm(
+        id().scale(0.5, 0.5, 0.5).translate(-0.7, 0.5, -0.8),
+        m().rgb(0.0, 0.2, 0.0)
+            .ambient(0.0)
+            .diffuse(0.4)
+            .specular(0.9)
+            .shininess(300.0)
+            .reflective(0.9)
+            .transparency(0.9)
+            .refractive_index(1.5),
+    );
 
     let mut world = World::empty();
     world.lights.push(light);
-    world.objects = vec![floor, ceiling, west_wall]; //, east_wall, north_wall, south_wall];
+    world.objects = vec![
+        floor, ceiling, west_wall, east_wall, north_wall, south_wall, sphere1, sphere2, sphere3,
+        sphere4, red, blue, green,
+    ];
     let image = camera.render(&world);
     std::fs::write("./reflect_refract.ppm", image.to_ppm())
-
 }

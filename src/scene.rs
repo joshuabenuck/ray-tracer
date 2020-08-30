@@ -30,7 +30,7 @@ impl World {
             let surface = comps.object.material.lighting(
                 &comps.object,
                 &l,
-                &comps.point,
+                &comps.over_point,
                 &comps.eyev,
                 &comps.normalv,
                 self.is_shadowed(comps.over_point),
@@ -470,7 +470,7 @@ mod tests {
     }
 
     #[test]
-    fn world_shade_hit() {
+    fn world_shade_hit_shadow() {
         // shade_hit() is given an intersection in shadow
         let mut w = World::empty();
         w.lights.push(PointLight::new(
@@ -486,7 +486,10 @@ mod tests {
         let comps = i.prepare_computations(&r, vec![i]);
         let c = w.shade_hit(&comps, 1);
         assert_eq!(c, Color::new(0.1, 0.1, 0.1));
+    }
 
+    #[test]
+    fn world_shade_hit_reflective() {
         // shade_hit() with a reflective material
         let w = World::default();
         let mut material = Material::new();
@@ -495,7 +498,7 @@ mod tests {
         let r = Ray::new(pt(0.0, 0.0, -3.0), v(0.0, -twosqrttwo(), twosqrttwo()));
         let i = Intersection::new(twosqrt(), shape);
         let comps = i.prepare_computations(&r, vec![i]);
-        let color = w.shade_hit(&comps, 1);
+        let color = w.shade_hit(&comps, 5);
         // original values
         // assert_eq!(color, Color::new(0.87677, 0.92436, 0.82918));
         assert_eq!(color, Color::new(0.87675, 0.92434, 0.82917));
@@ -601,9 +604,13 @@ mod tests {
         let comps = i.prepare_computations(&r, xs);
         let c = w.refracted_color(&comps, 5);
         assert_eq!(c, Color::new(0.0, 0.0, 0.0));
+    }
 
+    #[test]
+    fn world_refracted_color_recursive() {
         // the refracted color at maximum recursive depth
         let w = World::default();
+        let r = Ray::new(pt(0.0, 0.0, -5.0), v(0.0, 0.0, 1.0));
         let mut shape = w.objects[0];
         shape.material.transparency = 1.0;
         shape.material.refractive_index = 1.5;
@@ -612,7 +619,10 @@ mod tests {
         let comps = i.prepare_computations(&r, xs);
         let c = w.refracted_color(&comps, 0);
         assert_eq!(c, Color::new(0.0, 0.0, 0.0));
+    }
 
+    #[test]
+    fn world_refracted_total_internal_reflection() {
         // the refracted color under total internal reflection
         let w = World::default();
         let mut shape = w.objects[0];
@@ -629,7 +639,10 @@ mod tests {
         let comps = i.prepare_computations(&r, xs);
         let c = w.refracted_color(&comps, 5);
         assert_eq!(c, Color::new(0.0, 0.0, 0.0));
+    }
 
+    #[test]
+    fn world_refracted_color_refracted_ray() {
         // the refracted color with a refracted ray
         let mut w = World::default();
         let a = &mut w.objects[0];

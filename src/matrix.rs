@@ -79,6 +79,10 @@ impl Index<usize> for Matrix3x3 {
     }
 }
 
+pub fn id() -> Matrix4x4 {
+    Matrix4x4::identity()
+}
+
 #[derive(Debug, Copy, Clone)]
 pub struct Matrix4x4(pub [[f64; 4]; 4]);
 

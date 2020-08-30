@@ -324,6 +324,10 @@ impl PointLight {
     }
 }
 
+pub fn m() -> Material {
+    Material::new()
+}
+
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Material {
     pub color: Color,
@@ -350,6 +354,51 @@ impl Material {
             transparency: 0.0,
             refractive_index: 1.0,
         }
+    }
+
+    pub fn rgb(mut self, r: f64, g: f64, b: f64) -> Material {
+        self.color = Color::new(r, g, b);
+        self
+    }
+
+    pub fn color(mut self, color: Color) -> Material {
+        self.color = color;
+        self
+    }
+
+    pub fn ambient(mut self, ambient: f64) -> Material {
+        self.ambient = ambient;
+        self
+    }
+
+    pub fn diffuse(mut self, diffuse: f64) -> Material {
+        self.diffuse = diffuse;
+        self
+    }
+
+    pub fn specular(mut self, specular: f64) -> Material {
+        self.specular = specular;
+        self
+    }
+
+    pub fn shininess(mut self, shininess: f64) -> Material {
+        self.shininess = shininess;
+        self
+    }
+
+    pub fn transparency(mut self, transparency: f64) -> Material {
+        self.transparency = transparency;
+        self
+    }
+
+    pub fn reflective(mut self, reflective: f64) -> Material {
+        self.reflective = reflective;
+        self
+    }
+
+    pub fn refractive_index(mut self, refractive_index: f64) -> Material {
+        self.refractive_index = refractive_index;
+        self
     }
 
     pub fn lighting(
