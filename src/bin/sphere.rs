@@ -46,12 +46,16 @@ fn main() -> Result<(), std::io::Error> {
 
             if let Some(hit) = xs.hit() {
                 let point = r.position(hit.t);
-                let normal = hit.object.normal_at(point);
+                let normal = hit.object.borrow().normal_at(point);
                 let eye = -r.direction;
-                let color =
-                    hit.object
-                        .material
-                        .lighting(&hit.object, &light, &point, &eye, &normal, false);
+                let color = hit.object.borrow().material.lighting(
+                    &hit.object.borrow(),
+                    &light,
+                    &point,
+                    &eye,
+                    &normal,
+                    false,
+                );
                 canvas.write_pixel(x, y, color);
             }
         }

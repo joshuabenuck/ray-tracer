@@ -2,10 +2,10 @@ use crate::{
     intersect, pt, schlick, spherem, spheret, Canvas, Color, Comps, Intersection, Intersections,
     Material, Matrix4x4, PointLight, Ray, Shape, Tuple,
 };
-use std::rc::Rc;
+use std::{cell::RefCell, rc::Rc};
 
 pub struct World {
-    pub objects: Vec<Rc<Shape>>,
+    pub objects: Vec<Rc<RefCell<Shape>>>,
     pub lights: Vec<PointLight>,
 }
 
@@ -28,8 +28,8 @@ impl World {
 
     pub fn shade_hit(&self, comps: &Comps, remaining: usize) -> Color {
         let mut cs = self.lights.iter().map(|l| {
-            let surface = comps.object.material.lighting(
-                &comps.object,
+            let surface = comps.object.borrow().material.lighting(
+                &comps.object.borrow(),
                 &l,
                 &comps.over_point,
                 &comps.eyev,
@@ -39,7 +39,7 @@ impl World {
             let reflected = self.reflected_color(&comps, remaining);
             let refracted = self.refracted_color(&comps, remaining);
 
-            let material = comps.object.material;
+            let material = comps.object.borrow().material;
             if material.reflective > 0.0 && material.transparency > 0.0 {
                 let reflectance = schlick(&comps);
                 return surface + reflected * reflectance + refracted * (1.0 - reflectance);
@@ -86,19 +86,19 @@ impl World {
         if remaining == 0 {
             return Color::new(0.0, 0.0, 0.0);
         }
-        if comps.object.material.reflective == 0.0 {
+        if comps.object.borrow().material.reflective == 0.0 {
             return Color::new(0.0, 0.0, 0.0);
         }
         let reflect_ray = Ray::new(comps.over_point, comps.reflectv);
         let color = self.color_at(&reflect_ray, remaining - 1);
-        color * comps.object.material.reflective
+        color * comps.object.borrow().material.reflective
     }
 
     pub fn refracted_color(&self, comps: &Comps, remaining: usize) -> Color {
         if remaining == 0 {
             return Color::new(0.0, 0.0, 0.0);
         }
-        if comps.object.material.transparency == 0.0 {
+        if comps.object.borrow().material.transparency == 0.0 {
             return Color::new(0.0, 0.0, 0.0);
         }
         // find the ratio of the first index of refraction to the second
@@ -125,7 +125,7 @@ impl World {
 
         // find the color of the refracted ray, making sure to multiply
         // by the transparency value to account for any opacity
-        self.color_at(&refract_ray, remaining - 1) * comps.object.material.transparency
+        self.color_at(&refract_ray, remaining - 1) * comps.object.borrow().material.transparency
     }
 }
 
@@ -323,15 +323,16 @@ mod tests {
 
         // the color with an intersection behind the ray
         // inside the outer sphere, but outside the inner sphere
-        let mut w = World::default();
-        let outer = Rc::get_mut(&mut w.objects[0]).unwrap();
+        let w = World::default();
+        let mut outer = w.objects[0].borrow_mut();
         outer.material.ambient = 1.0;
-        let inner = Rc::get_mut(&mut w.objects[1]).unwrap();
+        drop(outer);
+        let mut inner = w.objects[1].borrow_mut();
         inner.material.ambient = 1.0;
         drop(inner);
         let r = Ray::new(pt(0.0, 0.0, 0.75), v(0.0, 0.0, -1.0));
         let c = w.color_at(&r, 1);
-        assert_eq!(c, w.objects[1].material.color);
+        assert_eq!(c, w.objects[1].borrow().material.color);
 
         // color_at() with mutually reflective surfaces
         let mut w = World::empty();
@@ -567,8 +568,8 @@ mod tests {
         // the reflected color for a non-reflective material
         let mut w = World::default();
         let r = Ray::new(pt(0.0, 0.0, 0.0), v(0.0, 0.0, 1.0));
-        let mut shape = &mut w.objects[1];
-        Rc::get_mut(&mut shape).unwrap().material.ambient = 1.0;
+        let shape = &mut w.objects[1];
+        shape.borrow_mut().material.ambient = 1.0;
         let i = Intersection::new(1.0, shape.clone());
         let comps = i.prepare_computations(&r, vec![i.clone()]);
         let color = w.reflected_color(&comps, 1);
@@ -616,8 +617,8 @@ mod tests {
         let mut w = World::default();
         let r = Ray::new(pt(0.0, 0.0, -5.0), v(0.0, 0.0, 1.0));
         let shape = &mut w.objects[0];
-        Rc::get_mut(shape).unwrap().material.transparency = 1.0;
-        Rc::get_mut(shape).unwrap().material.refractive_index = 1.5;
+        shape.borrow_mut().material.transparency = 1.0;
+        shape.borrow_mut().material.refractive_index = 1.5;
         let xs = vec![
             Intersection::new(4.0, shape.clone()),
             Intersection::new(6.0, shape.clone()),
@@ -633,8 +634,8 @@ mod tests {
         // the refracted color under total internal reflection
         let mut w = World::default();
         let shape = &mut w.objects[0];
-        Rc::get_mut(shape).unwrap().material.transparency = 1.0;
-        Rc::get_mut(shape).unwrap().material.refractive_index = 1.5;
+        shape.borrow_mut().material.transparency = 1.0;
+        shape.borrow_mut().material.refractive_index = 1.5;
         let r = Ray::new(pt(0.0, 0.0, twosqrttwo()), v(0.0, 1.0, 0.0));
         let xs = vec![
             Intersection::new(-twosqrttwo(), shape.clone()),
@@ -651,15 +652,17 @@ mod tests {
     #[test]
     fn world_refracted_color_refracted_ray() {
         // the refracted color with a refracted ray
-        let mut w = World::default();
-        let a = &mut w.objects[0];
-        let mut material = &mut Rc::get_mut(a).unwrap().material;
+        let w = World::default();
+        let a = &w.objects[0];
+        let mut material = a.borrow().material.clone();
         material.ambient = 1.0;
         material.pattern = Some(test_pattern());
-        let b = &mut w.objects[1];
-        let mut material = &mut Rc::get_mut(b).unwrap().material;
+        a.borrow_mut().material = material;
+        let b = &w.objects[1];
+        let mut material = b.borrow().material.clone();
         material.transparency = 1.0;
         material.refractive_index = 1.5;
+        b.borrow_mut().material = material;
         let r = Ray::new(pt(0.0, 0.0, 0.1), v(0.0, 1.0, 0.0));
         let xs = vec![
             Intersection::new(-0.9899, w.objects[0].clone()),

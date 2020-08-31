@@ -1,90 +1,105 @@
 use crate::{equal, pt, v, Intersection, Material, Matrix4x4, Ray, Tuple, EPSILON};
-use std::rc::Rc;
+use std::{cell::RefCell, fmt::Debug, rc::Rc};
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum ShapeForm {
     Sphere,
     Plane,
     Cube,
     Cylinder(f64, f64, bool),
+    Group(Vec<Rc<RefCell<Shape>>>),
     Test,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+impl Debug for ShapeForm {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        println!("shape form");
+        Ok(())
+    }
+}
+
+#[derive(Clone, PartialEq)]
 pub struct Shape {
     pub transform: Matrix4x4,
     pub material: Material,
     pub form: ShapeForm,
-    pub parent: Option<Rc<Shape>>,
+    pub parent: Option<Rc<RefCell<Shape>>>,
+}
+
+impl Debug for Shape {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        println!("shape");
+        Ok(())
+    }
 }
 
 static mut SAVED_RAY: Option<Ray> = None;
 
-pub fn test_shape() -> Rc<Shape> {
-    Rc::new(Shape {
+pub fn test_shape() -> Rc<RefCell<Shape>> {
+    Rc::new(RefCell::new(Shape {
         transform: Matrix4x4::identity(),
         material: Material::new(),
         form: ShapeForm::Test,
         parent: None,
-    })
+    }))
 }
 
 #[inline]
-pub fn plane() -> Rc<Shape> {
-    Rc::new(Shape {
+pub fn plane() -> Rc<RefCell<Shape>> {
+    Rc::new(RefCell::new(Shape {
         transform: Matrix4x4::identity(),
         material: Material::new(),
         form: ShapeForm::Plane,
         parent: None,
-    })
+    }))
 }
 
 #[inline]
-pub fn planet(transform: Matrix4x4) -> Rc<Shape> {
+pub fn planet(transform: Matrix4x4) -> Rc<RefCell<Shape>> {
     planetm(transform, Material::new())
 }
 
 #[inline]
-pub fn planem(material: Material) -> Rc<Shape> {
+pub fn planem(material: Material) -> Rc<RefCell<Shape>> {
     planetm(Matrix4x4::identity(), material)
 }
 
 #[inline]
-pub fn planetm(transform: Matrix4x4, material: Material) -> Rc<Shape> {
-    Rc::new(Shape {
+pub fn planetm(transform: Matrix4x4, material: Material) -> Rc<RefCell<Shape>> {
+    Rc::new(RefCell::new(Shape {
         material,
         transform,
         form: ShapeForm::Plane,
         parent: None,
-    })
+    }))
 }
 
 #[inline]
-pub fn sphere() -> Rc<Shape> {
+pub fn sphere() -> Rc<RefCell<Shape>> {
     spheretm(Matrix4x4::identity(), Material::new())
 }
 
-pub fn spheretm(transform: Matrix4x4, material: Material) -> Rc<Shape> {
-    Rc::new(Shape {
+pub fn spheretm(transform: Matrix4x4, material: Material) -> Rc<RefCell<Shape>> {
+    Rc::new(RefCell::new(Shape {
         transform,
         material,
         form: ShapeForm::Sphere,
         parent: None,
-    })
+    }))
 }
 
 #[inline]
-pub fn spheret(transform: Matrix4x4) -> Rc<Shape> {
+pub fn spheret(transform: Matrix4x4) -> Rc<RefCell<Shape>> {
     spheretm(transform, Material::new())
 }
 
 #[inline]
-pub fn spherem(material: Material) -> Rc<Shape> {
+pub fn spherem(material: Material) -> Rc<RefCell<Shape>> {
     spheretm(Matrix4x4::identity(), material)
 }
 
 #[inline]
-pub fn glass_sphere() -> Rc<Shape> {
+pub fn glass_sphere() -> Rc<RefCell<Shape>> {
     let mut m = Material::new();
     m.transparency = 1.0;
     m.refractive_index = 1.5;
@@ -92,7 +107,7 @@ pub fn glass_sphere() -> Rc<Shape> {
 }
 
 #[inline]
-pub fn glass_spheret(transform: Matrix4x4) -> Rc<Shape> {
+pub fn glass_spheret(transform: Matrix4x4) -> Rc<RefCell<Shape>> {
     let mut m = Material::new();
     m.transparency = 1.0;
     m.refractive_index = 1.5;
@@ -100,42 +115,42 @@ pub fn glass_spheret(transform: Matrix4x4) -> Rc<Shape> {
 }
 
 #[inline]
-pub fn cube() -> Rc<Shape> {
+pub fn cube() -> Rc<RefCell<Shape>> {
     cubetm(Matrix4x4::identity(), Material::new())
 }
 
 #[inline]
-pub fn cubet(transform: Matrix4x4) -> Rc<Shape> {
+pub fn cubet(transform: Matrix4x4) -> Rc<RefCell<Shape>> {
     cubetm(transform, Material::new())
 }
 
 #[inline]
-pub fn cubem(material: Material) -> Rc<Shape> {
+pub fn cubem(material: Material) -> Rc<RefCell<Shape>> {
     cubetm(Matrix4x4::identity(), material)
 }
 
 #[inline]
-pub fn cubetm(transform: Matrix4x4, material: Material) -> Rc<Shape> {
-    Rc::new(Shape {
+pub fn cubetm(transform: Matrix4x4, material: Material) -> Rc<RefCell<Shape>> {
+    Rc::new(RefCell::new(Shape {
         transform,
         material,
         form: ShapeForm::Cube,
         parent: None,
-    })
+    }))
 }
 
 #[inline]
-pub fn cylinder(min: f64, max: f64, closed: bool) -> Rc<Shape> {
+pub fn cylinder(min: f64, max: f64, closed: bool) -> Rc<RefCell<Shape>> {
     cylindertm(Matrix4x4::identity(), Material::new(), min, max, closed)
 }
 
 #[inline]
-pub fn cylindert(transform: Matrix4x4, min: f64, max: f64, closed: bool) -> Rc<Shape> {
+pub fn cylindert(transform: Matrix4x4, min: f64, max: f64, closed: bool) -> Rc<RefCell<Shape>> {
     cylindertm(transform, Material::new(), min, max, closed)
 }
 
 #[inline]
-pub fn cylinderm(material: Material, min: f64, max: f64, closed: bool) -> Rc<Shape> {
+pub fn cylinderm(material: Material, min: f64, max: f64, closed: bool) -> Rc<RefCell<Shape>> {
     cylindertm(Matrix4x4::identity(), material, min, max, closed)
 }
 
@@ -146,13 +161,40 @@ pub fn cylindertm(
     min: f64,
     max: f64,
     closed: bool,
-) -> Rc<Shape> {
-    Rc::new(Shape {
+) -> Rc<RefCell<Shape>> {
+    Rc::new(RefCell::new(Shape {
         transform,
         material,
         form: ShapeForm::Cylinder(min, max, closed),
         parent: None,
-    })
+    }))
+}
+
+#[inline]
+pub fn group() -> Rc<RefCell<Shape>> {
+    Rc::new(RefCell::new(Shape {
+        transform: Matrix4x4::identity(),
+        material: Material::new(),
+        form: ShapeForm::Group(Vec::new()),
+        parent: None,
+    }))
+}
+
+pub fn add_child(group: &mut Rc<RefCell<Shape>>, child: &mut Rc<RefCell<Shape>>) {
+    let mut c = child.borrow_mut();
+    c.parent = Some(group.clone());
+    if let ShapeForm::Group(children) = &mut group.borrow_mut().form {
+        children.push(child.clone());
+        return;
+    }
+    panic!("add_child may only be called on a group!");
+}
+
+pub fn children(group: &Rc<RefCell<Shape>>) -> Vec<Rc<RefCell<Shape>>> {
+    if let ShapeForm::Group(children) = &group.borrow().form {
+        return children.clone();
+    }
+    panic!("children may only be called on a group!");
 }
 
 fn check_axis(origin: f64, direction: f64) -> (f64, f64) {
@@ -184,8 +226,8 @@ fn check_cap(ray: &Ray, t: f64) -> bool {
     x.powi(2) + z.powi(2) <= 1.0
 }
 
-fn intersect_caps(cyl: &Rc<Shape>, ray: &Ray, xs: &mut Vec<Intersection>) {
-    match cyl.form {
+fn intersect_caps(cyl: &Rc<RefCell<Shape>>, ray: &Ray, xs: &mut Vec<Intersection>) {
+    match cyl.borrow().form {
         ShapeForm::Cylinder(max, min, closed) => {
             // caps only matter if the cylinder is closed and might
             // possibly be interesected by the ray.
@@ -211,13 +253,13 @@ fn intersect_caps(cyl: &Rc<Shape>, ray: &Ray, xs: &mut Vec<Intersection>) {
     }
 }
 
-pub fn intersect(shape: &Rc<Shape>, ray: &Ray) -> Vec<Intersection> {
-    let ray = ray.transform(shape.transform.inverse().unwrap());
+pub fn intersect(shape: &Rc<RefCell<Shape>>, ray: &Ray) -> Vec<Intersection> {
+    let ray = ray.transform(shape.borrow().transform.inverse().unwrap());
     local_intersect(shape, &ray)
 }
 
-pub fn local_intersect(shape: &Rc<Shape>, ray: &Ray) -> Vec<Intersection> {
-    match shape.form {
+pub fn local_intersect(shape: &Rc<RefCell<Shape>>, ray: &Ray) -> Vec<Intersection> {
+    match shape.borrow().form {
         ShapeForm::Test => {
             unsafe {
                 SAVED_RAY = Some(*ray);
@@ -310,6 +352,7 @@ pub fn local_intersect(shape: &Rc<Shape>, ray: &Ray) -> Vec<Intersection> {
             intersect_caps(shape, ray, &mut xs);
             xs
         }
+        ShapeForm::Group(..) => Vec::new(),
     }
 }
 
@@ -357,6 +400,7 @@ impl Shape {
                 }
                 v(local_point.x, 0.0, local_point.z)
             }
+            ShapeForm::Group(..) => v(0.0, 0.0, 0.0),
         }
     }
 }
@@ -369,29 +413,27 @@ mod tests {
     #[test]
     fn shape_operations() {
         // the default transformation
-        let mut s = test_shape();
-        let mut mut_s = Rc::get_mut(&mut s).unwrap();
-        assert_eq!(mut_s.transform, Matrix4x4::identity());
+        let s = test_shape();
+        assert_eq!(s.borrow_mut().transform, Matrix4x4::identity());
 
         // assigning a transformation
         let t = Matrix4x4::translation(2.0, 3.0, 4.0);
-        mut_s.transform = t;
-        assert_eq!(mut_s.transform, t);
+        s.borrow_mut().transform = t;
+        assert_eq!(s.borrow_mut().transform, t);
 
         // the default material
-        assert_eq!(mut_s.material, Material::new());
+        assert_eq!(s.borrow_mut().material, Material::new());
 
         // assigning a material
         let mut m = Material::new();
         m.ambient = 1.0;
-        mut_s.material = m;
-        assert_eq!(mut_s.material, m);
+        s.borrow_mut().material = m;
+        assert_eq!(s.borrow_mut().material, m);
 
         // intersecting a scaled shape with a ray
         let r = Ray::new(pt(0.0, 0.0, -5.0), v(0.0, 0.0, 1.0));
-        let mut s = test_shape();
-        let mut mut_s = Rc::get_mut(&mut s).unwrap();
-        mut_s.transform = Matrix4x4::scaling(2.0, 2.0, 2.0);
+        let s = test_shape();
+        s.borrow_mut().transform = Matrix4x4::scaling(2.0, 2.0, 2.0);
         unsafe {
             SAVED_RAY = None;
             intersect(&s, &r);
@@ -400,8 +442,7 @@ mod tests {
         };
 
         // intersecting a translated shape with a ray
-        let mut mut_s = Rc::get_mut(&mut s).unwrap();
-        mut_s.transform = Matrix4x4::translation(5.0, 0.0, 0.0);
+        s.borrow_mut().transform = Matrix4x4::translation(5.0, 0.0, 0.0);
         unsafe {
             SAVED_RAY = None;
             intersect(&s, &r);
@@ -414,25 +455,64 @@ mod tests {
     fn sphere_glass() {
         // a helper for producing a sphere with a glassy material
         let s = glass_sphere();
-        assert_eq!(s.transform, Matrix4x4::identity());
-        assert_eq!(s.material.transparency, 1.0);
-        assert_eq!(s.material.refractive_index, 1.5);
+        assert_eq!(s.borrow().transform, Matrix4x4::identity());
+        assert_eq!(s.borrow().material.transparency, 1.0);
+        assert_eq!(s.borrow().material.refractive_index, 1.5);
+    }
+
+    #[test]
+    fn group_create() {
+        // creating a new group
+        let g = group();
+        assert_eq!(g.borrow().transform, Matrix4x4::identity());
+        let g = &g.borrow();
+        if let ShapeForm::Group(children) = &g.form {
+            assert_eq!(children.len(), 0);
+        } else {
+            panic!("failed!");
+        }
+    }
+
+    #[test]
+    fn group_add_children() {
+        // adding a child to a group
+        let mut g = group();
+        let mut s = test_shape();
+        add_child(&mut g, &mut s);
+        let children = children(&g);
+        assert_eq!(children.len(), 1);
+        // assert!(children.iter().any(|e| e == &s));
+        // assert_eq!(s.borrow().parent.is_some(), true);
+        // assert_eq!(s.borrow().parent.as_ref().unwrap(), &g);
+        for c in children.iter() {
+            println!("{:?}", c);
+        }
+        // s.borrow().parent.is_some();
+        // s.borrow().parent.as_ref().unwrap();
+    }
+
+    #[test]
+    fn shape_parent() {
+        // a shape has a parent attribute
+        let s = test_shape();
+        assert_eq!(s.borrow().parent, None);
     }
 
     #[test]
     fn shape_transformed_normal() {
         // computing the normal on a translated shape
-        let mut s = test_shape();
-        let mut mut_s = Rc::get_mut(&mut s).unwrap();
-        mut_s.transform = Matrix4x4::translation(0.0, 1.0, 0.0);
-        let n = mut_s.normal_at(pt(0.0, 1.70711, -0.70711));
+        let s = test_shape();
+        s.borrow_mut().transform = Matrix4x4::translation(0.0, 1.0, 0.0);
+        let n = s.borrow_mut().normal_at(pt(0.0, 1.70711, -0.70711));
         assert_eq!(n, v(0.0, 0.70711, -0.70711));
 
         // computing the normal on a transformed shape
-        let mut s = test_shape();
-        let mut mut_s = Rc::get_mut(&mut s).unwrap();
-        mut_s.transform = Matrix4x4::scaling(1.0, 0.5, 1.0) * Matrix4x4::rotation_z(PI / 5.0);
-        let n = mut_s.normal_at(pt(0.0, 2.0_f64 / 2.0, -2.0_f64 / 2.0));
+        let s = test_shape();
+        s.borrow_mut().transform =
+            Matrix4x4::scaling(1.0, 0.5, 1.0) * Matrix4x4::rotation_z(PI / 5.0);
+        let n = s
+            .borrow_mut()
+            .normal_at(pt(0.0, 2.0_f64 / 2.0, -2.0_f64 / 2.0));
         assert_eq!(n, v(0.0, 0.97014, -0.24254));
     }
 
@@ -639,19 +719,19 @@ mod tests {
     fn sphere_normal_at() {
         // the normal on a sphere at a point on the x axis
         let s = sphere();
-        let n = s.normal_at(pt(1.0, 0.0, 0.0));
+        let n = s.borrow().normal_at(pt(1.0, 0.0, 0.0));
         assert_eq!(n, v(1.0, 0.0, 0.0));
 
         // the normal on a sphere at a point on the y axis
-        let n = s.normal_at(pt(0.0, 1.0, 0.0));
+        let n = s.borrow().normal_at(pt(0.0, 1.0, 0.0));
         assert_eq!(n, v(0.0, 1.0, 0.0));
 
         // the normal on a sphere at a point on the y axis
-        let n = s.normal_at(pt(0.0, 0.0, 1.0));
+        let n = s.borrow().normal_at(pt(0.0, 0.0, 1.0));
         assert_eq!(n, v(0.0, 0.0, 1.0));
 
         // the normal on a sphere at a point on a nonaxial point
-        let n = s.normal_at(pt(
+        let n = s.borrow().normal_at(pt(
             3.0_f64.sqrt() / 3.0,
             3.0_f64.sqrt() / 3.0,
             3.0_f64.sqrt() / 3.0,
@@ -673,9 +753,9 @@ mod tests {
     fn plane_normal_at() {
         // the normal of a plane is constant everywhere
         let p = plane();
-        let n1 = p.normal_at(pt(0.0, 0.0, 0.0));
-        let n2 = p.normal_at(pt(10.0, 0.0, -10.0));
-        let n3 = p.normal_at(pt(-5.0, 0.0, 150.0));
+        let n1 = p.borrow().normal_at(pt(0.0, 0.0, 0.0));
+        let n2 = p.borrow().normal_at(pt(10.0, 0.0, -10.0));
+        let n3 = p.borrow().normal_at(pt(-5.0, 0.0, 150.0));
         assert_eq!(n1, v(0.0, 1.0, 0.0));
         assert_eq!(n2, v(0.0, 1.0, 0.0));
         assert_eq!(n3, v(0.0, 1.0, 0.0));
@@ -686,7 +766,7 @@ mod tests {
         // the normal of the surface of a cube
         fn test(point: Tuple, normal: Tuple) {
             let c = cube();
-            let n = c.normal_at(point);
+            let n = c.borrow().normal_at(point);
             assert_eq!(n, normal);
         }
 
@@ -706,7 +786,7 @@ mod tests {
         // normal vector on a cylinder
         fn test(point: Tuple, normal: Tuple) {
             let cyl = cylinder(std::f64::NEG_INFINITY, std::f64::INFINITY, false);
-            let n = cyl.local_normal_at(point);
+            let n = cyl.borrow().local_normal_at(point);
             assert_eq!(n, normal);
         }
         test(pt(1.0, 0.0, 0.0), v(1.0, 0.0, 0.0));
@@ -720,7 +800,7 @@ mod tests {
         // the normal vector on a cylinder's end caps
         fn test(point: Tuple, normal: Tuple) {
             let cyl = cylinder(1.0, 2.0, true);
-            let n = cyl.local_normal_at(point);
+            let n = cyl.borrow().local_normal_at(point);
             assert_eq!(n, normal);
         }
 

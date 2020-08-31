@@ -165,32 +165,67 @@ mod tests {
         let eyev = v(0.0, 0.0, -1.0);
         let normalv = v(0.0, 0.0, -1.0);
         let light = PointLight::new(pt(0.0, 0.0, -10.0), Color::new(1.0, 1.0, 1.0));
-        let result = m.lighting(&sphere(), &light, &position, &eyev, &normalv, false);
+        let result = m.lighting(
+            &sphere().borrow(),
+            &light,
+            &position,
+            &eyev,
+            &normalv,
+            false,
+        );
         assert_eq!(result, Color::new(1.9, 1.9, 1.9));
 
         // lighting with the surface in shadow
         let in_shadow = true;
-        let result = m.lighting(&sphere(), &light, &position, &eyev, &normalv, in_shadow);
+        let result = m.lighting(
+            &sphere().borrow(),
+            &light,
+            &position,
+            &eyev,
+            &normalv,
+            in_shadow,
+        );
         assert_eq!(result, Color::new(0.1, 0.1, 0.1));
 
         // lighting with the eye between light and surface, eye offset 45 degrees
         // ambient and diffuse unchanged because the angle between them is unchanged
         // specular drops off to effectively zero
         let eyev = v(0.0, 2.0_f64.sqrt() / 2.0, 2.0_f64.sqrt() / 2.0);
-        let result = m.lighting(&sphere(), &light, &position, &eyev, &normalv, false);
+        let result = m.lighting(
+            &sphere().borrow(),
+            &light,
+            &position,
+            &eyev,
+            &normalv,
+            false,
+        );
         assert_eq!(result, Color::new(1.0, 1.0, 1.0));
 
         // lighting with eye opposite surface, light offset 45 degrees
         let eyev = v(0.0, 0.0, -1.0);
         let light = PointLight::new(pt(0.0, 10.0, -10.0), Color::new(1.0, 1.0, 1.0));
-        let result = m.lighting(&sphere(), &light, &position, &eyev, &normalv, false);
+        let result = m.lighting(
+            &sphere().borrow(),
+            &light,
+            &position,
+            &eyev,
+            &normalv,
+            false,
+        );
         assert_eq!(result, Color::new(0.7364, 0.7364, 0.7364));
 
         // lighting with eye in the path of the reflection vector
         // makes specular at full strength with ambient and diffuse same as last test
         let eyev = v(0.0, -2.0_f64.sqrt() / 2.0, -2.0_f64.sqrt() / 2.0);
         let light = PointLight::new(pt(0.0, 10.0, -10.0), Color::new(1.0, 1.0, 1.0));
-        let result = m.lighting(&sphere(), &light, &position, &eyev, &normalv, false);
+        let result = m.lighting(
+            &sphere().borrow(),
+            &light,
+            &position,
+            &eyev,
+            &normalv,
+            false,
+        );
         assert_eq!(result, Color::new(1.6364, 1.6364, 1.6364,));
 
         // light with the light behind the surface
@@ -199,7 +234,14 @@ mod tests {
         // The total intensity should be the same as the ambient component
         let eyev = v(0.0, 0.0, -1.0);
         let light = PointLight::new(pt(0.0, 0.0, 10.0), Color::new(1.0, 1.0, 1.0));
-        let result = m.lighting(&sphere(), &light, &position, &eyev, &normalv, false);
+        let result = m.lighting(
+            &sphere().borrow(),
+            &light,
+            &position,
+            &eyev,
+            &normalv,
+            false,
+        );
         assert_eq!(result, Color::new(0.1, 0.1, 0.1));
     }
 
@@ -215,7 +257,7 @@ mod tests {
         let normalv = v(0.0, 0.0, -1.0);
         let light = PointLight::new(pt(0.0, 0.0, -10.0), white());
         let c1 = m.lighting(
-            &sphere(),
+            &sphere().borrow(),
             &light,
             &pt(0.9, 0.0, 0.0),
             &eyev,
@@ -223,7 +265,7 @@ mod tests {
             false,
         );
         let c2 = m.lighting(
-            &sphere(),
+            &sphere().borrow(),
             &light,
             &pt(1.1, 0.0, 0.0),
             &eyev,

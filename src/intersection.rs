@@ -1,5 +1,5 @@
 use crate::{Ray, Shape, Tuple, EPSILON};
-use std::rc::Rc;
+use std::{cell::RefCell, rc::Rc};
 
 pub fn schlick(comps: &Comps) -> f64 {
     // find the cosine of the angle between the eye and the normal vectors
@@ -26,7 +26,7 @@ pub fn schlick(comps: &Comps) -> f64 {
 
 pub struct Comps {
     pub t: f64,
-    pub object: Rc<Shape>,
+    pub object: Rc<RefCell<Shape>>,
     pub point: Tuple,
     pub eyev: Tuple,
     pub normalv: Tuple,
@@ -41,11 +41,11 @@ pub struct Comps {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Intersection {
     pub t: f64,
-    pub object: Rc<Shape>,
+    pub object: Rc<RefCell<Shape>>,
 }
 
 impl Intersection {
-    pub fn new(t: f64, object: Rc<Shape>) -> Intersection {
+    pub fn new(t: f64, object: Rc<RefCell<Shape>>) -> Intersection {
         Intersection { t, object }
     }
 
@@ -57,7 +57,7 @@ impl Intersection {
         // precompute some useful values
         let point = ray.position(t);
         let eyev = -ray.direction;
-        let normalv = object.normal_at(point);
+        let normalv = object.borrow().normal_at(point);
         let inside = normalv.dot(&eyev) < 0.0;
         let normalv = if inside { -normalv } else { normalv };
         let reflectv = ray.direction.reflect(&normalv);
@@ -66,13 +66,18 @@ impl Intersection {
 
         let mut n1 = 1.0;
         let mut n2 = 1.0;
-        let mut containers: Vec<Rc<Shape>> = Vec::new();
+        let mut containers: Vec<Rc<RefCell<Shape>>> = Vec::new();
         for i in xs {
             if i == *self {
                 if containers.len() == 0 {
                     n1 = 1.0;
                 } else {
-                    n1 = containers.last().unwrap().material.refractive_index;
+                    n1 = containers
+                        .last()
+                        .unwrap()
+                        .borrow()
+                        .material
+                        .refractive_index;
                 }
             }
 
@@ -87,7 +92,12 @@ impl Intersection {
                 if containers.len() == 0 {
                     n2 = 1.0;
                 } else {
-                    n2 = containers.last().unwrap().material.refractive_index;
+                    n2 = containers
+                        .last()
+                        .unwrap()
+                        .borrow()
+                        .material
+                        .refractive_index;
                 }
                 break;
             }
@@ -230,10 +240,10 @@ mod tests {
     #[test]
     fn intersections_n1_n2() {
         let a = glass_spheret(Matrix4x4::scaling(2.0, 2.0, 2.0));
-        let mut b = glass_spheret(Matrix4x4::translation(0.0, 0.0, -0.25));
-        Rc::get_mut(&mut b).unwrap().material.refractive_index = 2.0;
-        let mut c = glass_spheret(Matrix4x4::translation(0.0, 0.0, 0.25));
-        Rc::get_mut(&mut c).unwrap().material.refractive_index = 2.5;
+        let b = glass_spheret(Matrix4x4::translation(0.0, 0.0, -0.25));
+        b.borrow_mut().material.refractive_index = 2.0;
+        let c = glass_spheret(Matrix4x4::translation(0.0, 0.0, 0.25));
+        c.borrow_mut().material.refractive_index = 2.5;
         let r = Ray::new(pt(0.0, 0.0, -4.0), v(0.0, 0.0, 1.0));
         let xs = vec![
             Intersection::new(2.0, a.clone()),
