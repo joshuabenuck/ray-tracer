@@ -17,8 +17,9 @@ pub use pattern::{
 pub use ray::{PointLight, Ray};
 pub use scene::{view_transform, Camera, World};
 pub use shape::{
-    glass_sphere, glass_spheret, plane, planem, planet, planetm, sphere, spherem, spheret,
-    spheretm, test_shape, Shape,
+    cube, cubem, cubet, cubetm, cylinder, cylinderm, cylindert, cylindertm, glass_sphere,
+    glass_spheret, intersect, plane, planem, planet, planetm, sphere, spherem, spheret, spheretm,
+    test_shape, Shape,
 };
 pub use tuple::{black, pt, v, white, Canvas, Color, Tuple};
 

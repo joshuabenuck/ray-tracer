@@ -1,5 +1,5 @@
 use ray_tracer::{
-    spheretm, Canvas, Color, Intersections, Material, Matrix4x4, PointLight, Ray, Tuple,
+    intersect, spheretm, Canvas, Color, Intersections, Material, Matrix4x4, PointLight, Ray, Tuple,
 };
 
 fn main() -> Result<(), std::io::Error> {
@@ -42,7 +42,7 @@ fn main() -> Result<(), std::io::Error> {
             let position = Tuple::point(world_x, world_y, wall_z);
 
             let r = Ray::new(ray_origin, (position - ray_origin).normalize());
-            let xs = shape.intersects(&r);
+            let xs = intersect(&shape, &r);
 
             if let Some(hit) = xs.hit() {
                 let point = r.position(hit.t);

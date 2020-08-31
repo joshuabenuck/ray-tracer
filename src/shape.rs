@@ -1,4 +1,5 @@
 use crate::{equal, pt, v, Intersection, Material, Matrix4x4, Ray, Tuple, EPSILON};
+use std::rc::Rc;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum ShapeForm {
@@ -9,76 +10,81 @@ pub enum ShapeForm {
     Test,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Shape {
     pub transform: Matrix4x4,
     pub material: Material,
     pub form: ShapeForm,
+    pub parent: Option<Rc<Shape>>,
 }
 
 static mut SAVED_RAY: Option<Ray> = None;
 
-pub fn test_shape() -> Shape {
-    Shape {
+pub fn test_shape() -> Rc<Shape> {
+    Rc::new(Shape {
         transform: Matrix4x4::identity(),
         material: Material::new(),
         form: ShapeForm::Test,
-    }
+        parent: None,
+    })
 }
 
 #[inline]
-pub fn plane() -> Shape {
-    Shape {
+pub fn plane() -> Rc<Shape> {
+    Rc::new(Shape {
         transform: Matrix4x4::identity(),
         material: Material::new(),
         form: ShapeForm::Plane,
-    }
+        parent: None,
+    })
 }
 
 #[inline]
-pub fn planet(transform: Matrix4x4) -> Shape {
+pub fn planet(transform: Matrix4x4) -> Rc<Shape> {
     planetm(transform, Material::new())
 }
 
 #[inline]
-pub fn planem(material: Material) -> Shape {
+pub fn planem(material: Material) -> Rc<Shape> {
     planetm(Matrix4x4::identity(), material)
 }
 
 #[inline]
-pub fn planetm(transform: Matrix4x4, material: Material) -> Shape {
-    Shape {
+pub fn planetm(transform: Matrix4x4, material: Material) -> Rc<Shape> {
+    Rc::new(Shape {
         material,
         transform,
         form: ShapeForm::Plane,
-    }
+        parent: None,
+    })
 }
 
 #[inline]
-pub fn sphere() -> Shape {
+pub fn sphere() -> Rc<Shape> {
     spheretm(Matrix4x4::identity(), Material::new())
 }
 
-pub fn spheretm(transform: Matrix4x4, material: Material) -> Shape {
-    Shape {
+pub fn spheretm(transform: Matrix4x4, material: Material) -> Rc<Shape> {
+    Rc::new(Shape {
         transform,
         material,
         form: ShapeForm::Sphere,
-    }
+        parent: None,
+    })
 }
 
 #[inline]
-pub fn spheret(transform: Matrix4x4) -> Shape {
+pub fn spheret(transform: Matrix4x4) -> Rc<Shape> {
     spheretm(transform, Material::new())
 }
 
 #[inline]
-pub fn spherem(material: Material) -> Shape {
+pub fn spherem(material: Material) -> Rc<Shape> {
     spheretm(Matrix4x4::identity(), material)
 }
 
 #[inline]
-pub fn glass_sphere() -> Shape {
+pub fn glass_sphere() -> Rc<Shape> {
     let mut m = Material::new();
     m.transparency = 1.0;
     m.refractive_index = 1.5;
@@ -86,7 +92,7 @@ pub fn glass_sphere() -> Shape {
 }
 
 #[inline]
-pub fn glass_spheret(transform: Matrix4x4) -> Shape {
+pub fn glass_spheret(transform: Matrix4x4) -> Rc<Shape> {
     let mut m = Material::new();
     m.transparency = 1.0;
     m.refractive_index = 1.5;
@@ -94,41 +100,42 @@ pub fn glass_spheret(transform: Matrix4x4) -> Shape {
 }
 
 #[inline]
-pub fn cube() -> Shape {
+pub fn cube() -> Rc<Shape> {
     cubetm(Matrix4x4::identity(), Material::new())
 }
 
 #[inline]
-pub fn cubet(transform: Matrix4x4) -> Shape {
+pub fn cubet(transform: Matrix4x4) -> Rc<Shape> {
     cubetm(transform, Material::new())
 }
 
 #[inline]
-pub fn cubem(material: Material) -> Shape {
+pub fn cubem(material: Material) -> Rc<Shape> {
     cubetm(Matrix4x4::identity(), material)
 }
 
 #[inline]
-pub fn cubetm(transform: Matrix4x4, material: Material) -> Shape {
-    Shape {
+pub fn cubetm(transform: Matrix4x4, material: Material) -> Rc<Shape> {
+    Rc::new(Shape {
         transform,
         material,
         form: ShapeForm::Cube,
-    }
+        parent: None,
+    })
 }
 
 #[inline]
-pub fn cylinder(min: f64, max: f64, closed: bool) -> Shape {
+pub fn cylinder(min: f64, max: f64, closed: bool) -> Rc<Shape> {
     cylindertm(Matrix4x4::identity(), Material::new(), min, max, closed)
 }
 
 #[inline]
-pub fn cylindert(transform: Matrix4x4, min: f64, max: f64, closed: bool) -> Shape {
+pub fn cylindert(transform: Matrix4x4, min: f64, max: f64, closed: bool) -> Rc<Shape> {
     cylindertm(transform, Material::new(), min, max, closed)
 }
 
 #[inline]
-pub fn cylinderm(material: Material, min: f64, max: f64, closed: bool) -> Shape {
+pub fn cylinderm(material: Material, min: f64, max: f64, closed: bool) -> Rc<Shape> {
     cylindertm(Matrix4x4::identity(), material, min, max, closed)
 }
 
@@ -139,12 +146,13 @@ pub fn cylindertm(
     min: f64,
     max: f64,
     closed: bool,
-) -> Shape {
-    Shape {
+) -> Rc<Shape> {
+    Rc::new(Shape {
         transform,
         material,
         form: ShapeForm::Cylinder(min, max, closed),
-    }
+        parent: None,
+    })
 }
 
 fn check_axis(origin: f64, direction: f64) -> (f64, f64) {
@@ -176,7 +184,7 @@ fn check_cap(ray: &Ray, t: f64) -> bool {
     x.powi(2) + z.powi(2) <= 1.0
 }
 
-fn intersect_caps(cyl: &Shape, ray: &Ray, xs: &mut Vec<Intersection>) {
+fn intersect_caps(cyl: &Rc<Shape>, ray: &Ray, xs: &mut Vec<Intersection>) {
     match cyl.form {
         ShapeForm::Cylinder(max, min, closed) => {
             // caps only matter if the cylinder is closed and might
@@ -203,109 +211,109 @@ fn intersect_caps(cyl: &Shape, ray: &Ray, xs: &mut Vec<Intersection>) {
     }
 }
 
-impl Shape {
-    pub fn intersects(&self, ray: &Ray) -> Vec<Intersection> {
-        let ray = ray.transform(self.transform.inverse().unwrap());
-        self.local_intersects(&ray)
-    }
+pub fn intersect(shape: &Rc<Shape>, ray: &Ray) -> Vec<Intersection> {
+    let ray = ray.transform(shape.transform.inverse().unwrap());
+    local_intersect(shape, &ray)
+}
 
-    pub fn local_intersects(&self, ray: &Ray) -> Vec<Intersection> {
-        match self.form {
-            ShapeForm::Test => {
-                unsafe {
-                    SAVED_RAY = Some(*ray);
-                }
+pub fn local_intersect(shape: &Rc<Shape>, ray: &Ray) -> Vec<Intersection> {
+    match shape.form {
+        ShapeForm::Test => {
+            unsafe {
+                SAVED_RAY = Some(*ray);
+            }
+            Vec::new()
+        }
+        ShapeForm::Sphere => {
+            let sphere_to_ray = ray.origin - pt(0.0, 0.0, 0.0);
+
+            let a = ray.direction.dot(&ray.direction);
+            let b = 2.0 * ray.direction.dot(&sphere_to_ray);
+            let c = sphere_to_ray.dot(&sphere_to_ray) - 1.0;
+
+            let discriminant = (b * b) - 4.0 * a * c;
+
+            if discriminant < 0.0 {
+                return Vec::new();
+            }
+
+            let t1 = (-b - discriminant.sqrt()) / (2.0 * a);
+            let t2 = (-b + discriminant.sqrt()) / (2.0 * a);
+            vec![
+                Intersection::new(t1, shape.clone()),
+                Intersection::new(t2, shape.clone()),
+            ]
+        }
+        ShapeForm::Plane => {
+            if ray.direction.y.abs() < EPSILON {
                 Vec::new()
-            }
-            ShapeForm::Sphere => {
-                let sphere_to_ray = ray.origin - pt(0.0, 0.0, 0.0);
-
-                let a = ray.direction.dot(&ray.direction);
-                let b = 2.0 * ray.direction.dot(&sphere_to_ray);
-                let c = sphere_to_ray.dot(&sphere_to_ray) - 1.0;
-
-                let discriminant = (b * b) - 4.0 * a * c;
-
-                if discriminant < 0.0 {
-                    return Vec::new();
-                }
-
-                let t1 = (-b - discriminant.sqrt()) / (2.0 * a);
-                let t2 = (-b + discriminant.sqrt()) / (2.0 * a);
-                vec![
-                    Intersection::new(t1, self.clone()),
-                    Intersection::new(t2, self.clone()),
-                ]
-            }
-            ShapeForm::Plane => {
-                if ray.direction.y.abs() < EPSILON {
-                    Vec::new()
-                } else {
-                    let t = -ray.origin.y / ray.direction.y;
-                    vec![Intersection::new(t, self.clone())]
-                }
-            }
-            ShapeForm::Cube => {
-                // How to avoid always doing all of these computations?
-                let (xtmin, xtmax) = check_axis(ray.origin.x, ray.direction.x);
-                let (ytmin, ytmax) = check_axis(ray.origin.y, ray.direction.y);
-                let (ztmin, ztmax) = check_axis(ray.origin.z, ray.direction.z);
-
-                let tmin = xtmin.max(ytmin).max(ztmin);
-                let tmax = xtmax.min(ytmax).min(ztmax);
-
-                if tmin > tmax {
-                    return Vec::new();
-                }
-
-                vec![
-                    Intersection::new(tmin, self.clone()),
-                    Intersection::new(tmax, self.clone()),
-                ]
-            }
-            ShapeForm::Cylinder(min, max, closed) => {
-                let a = ray.direction.x.powi(2) + ray.direction.z.powi(2);
-
-                // ray is parallel to the y axis
-                if equal(a, 0.0) {
-                    let mut xs = Vec::new();
-                    intersect_caps(self, ray, &mut xs);
-                    return xs;
-                }
-
-                let b = 2.0 * ray.origin.x * ray.direction.x + 2.0 * ray.origin.z * ray.direction.z;
-                let c = ray.origin.x.powi(2) + ray.origin.z.powi(2) - 1.0;
-
-                let disc = b.powi(2) - 4.0 * a * c;
-
-                // ray does not intersect the cylinder
-                if disc < 0.0 {
-                    return Vec::new();
-                }
-
-                let mut t0 = (-b - disc.sqrt()) / (2.0 * a);
-                let mut t1 = (-b + disc.sqrt()) / (2.0 * a);
-                if t0 > t1 {
-                    std::mem::swap(&mut t0, &mut t1);
-                }
-
-                let mut xs = Vec::new();
-
-                let y0 = ray.origin.y + t0 * ray.direction.y;
-                if min < y0 && y0 < max {
-                    xs.push(Intersection::new(t0, self.clone()));
-                }
-
-                let y1 = ray.origin.y + t1 * ray.direction.y;
-                if min < y1 && y1 < max {
-                    xs.push(Intersection::new(t1, self.clone()));
-                }
-                intersect_caps(self, ray, &mut xs);
-                xs
+            } else {
+                let t = -ray.origin.y / ray.direction.y;
+                vec![Intersection::new(t, shape.clone())]
             }
         }
-    }
+        ShapeForm::Cube => {
+            // How to avoid always doing all of these computations?
+            let (xtmin, xtmax) = check_axis(ray.origin.x, ray.direction.x);
+            let (ytmin, ytmax) = check_axis(ray.origin.y, ray.direction.y);
+            let (ztmin, ztmax) = check_axis(ray.origin.z, ray.direction.z);
 
+            let tmin = xtmin.max(ytmin).max(ztmin);
+            let tmax = xtmax.min(ytmax).min(ztmax);
+
+            if tmin > tmax {
+                return Vec::new();
+            }
+
+            vec![
+                Intersection::new(tmin, shape.clone()),
+                Intersection::new(tmax, shape.clone()),
+            ]
+        }
+        ShapeForm::Cylinder(min, max, _closed) => {
+            let a = ray.direction.x.powi(2) + ray.direction.z.powi(2);
+
+            // ray is parallel to the y axis
+            if equal(a, 0.0) {
+                let mut xs = Vec::new();
+                intersect_caps(shape, ray, &mut xs);
+                return xs;
+            }
+
+            let b = 2.0 * ray.origin.x * ray.direction.x + 2.0 * ray.origin.z * ray.direction.z;
+            let c = ray.origin.x.powi(2) + ray.origin.z.powi(2) - 1.0;
+
+            let disc = b.powi(2) - 4.0 * a * c;
+
+            // ray does not intersect the cylinder
+            if disc < 0.0 {
+                return Vec::new();
+            }
+
+            let mut t0 = (-b - disc.sqrt()) / (2.0 * a);
+            let mut t1 = (-b + disc.sqrt()) / (2.0 * a);
+            if t0 > t1 {
+                std::mem::swap(&mut t0, &mut t1);
+            }
+
+            let mut xs = Vec::new();
+
+            let y0 = ray.origin.y + t0 * ray.direction.y;
+            if min < y0 && y0 < max {
+                xs.push(Intersection::new(t0, shape.clone()));
+            }
+
+            let y1 = ray.origin.y + t1 * ray.direction.y;
+            if min < y1 && y1 < max {
+                xs.push(Intersection::new(t1, shape.clone()));
+            }
+            intersect_caps(shape, ray, &mut xs);
+            xs
+        }
+    }
+}
+
+impl Shape {
     pub fn normal_at(&self, world_point: Tuple) -> Tuple {
         let object_point = self.transform.inverse().unwrap() * world_point;
         let object_normal = self.local_normal_at(object_point);
@@ -338,7 +346,7 @@ impl Shape {
                     v(0.0, 0.0, local_point.z)
                 }
             }
-            ShapeForm::Cylinder(min, max, closed) => {
+            ShapeForm::Cylinder(min, max, _closed) => {
                 // compute the square of the distance from the y axis
                 let dist = local_point.x.powi(2) + local_point.z.powi(2);
 
@@ -362,38 +370,41 @@ mod tests {
     fn shape_operations() {
         // the default transformation
         let mut s = test_shape();
-        assert_eq!(s.transform, Matrix4x4::identity());
+        let mut mut_s = Rc::get_mut(&mut s).unwrap();
+        assert_eq!(mut_s.transform, Matrix4x4::identity());
 
         // assigning a transformation
         let t = Matrix4x4::translation(2.0, 3.0, 4.0);
-        s.transform = t;
-        assert_eq!(s.transform, t);
+        mut_s.transform = t;
+        assert_eq!(mut_s.transform, t);
 
         // the default material
-        assert_eq!(s.material, Material::new());
+        assert_eq!(mut_s.material, Material::new());
 
         // assigning a material
         let mut m = Material::new();
         m.ambient = 1.0;
-        s.material = m;
-        assert_eq!(s.material, m);
+        mut_s.material = m;
+        assert_eq!(mut_s.material, m);
 
         // intersecting a scaled shape with a ray
         let r = Ray::new(pt(0.0, 0.0, -5.0), v(0.0, 0.0, 1.0));
         let mut s = test_shape();
-        s.transform = Matrix4x4::scaling(2.0, 2.0, 2.0);
+        let mut mut_s = Rc::get_mut(&mut s).unwrap();
+        mut_s.transform = Matrix4x4::scaling(2.0, 2.0, 2.0);
         unsafe {
             SAVED_RAY = None;
-            s.intersects(&r);
+            intersect(&s, &r);
             assert_eq!(SAVED_RAY.unwrap().origin, pt(0.0, 0.0, -2.5));
             assert_eq!(SAVED_RAY.unwrap().direction, v(0.0, 0.0, 0.5));
         };
 
         // intersecting a translated shape with a ray
-        s.transform = Matrix4x4::translation(5.0, 0.0, 0.0);
+        let mut mut_s = Rc::get_mut(&mut s).unwrap();
+        mut_s.transform = Matrix4x4::translation(5.0, 0.0, 0.0);
         unsafe {
             SAVED_RAY = None;
-            s.intersects(&r);
+            intersect(&s, &r);
             assert_eq!(SAVED_RAY.unwrap().origin, pt(-5.0, 0.0, -5.0));
             assert_eq!(SAVED_RAY.unwrap().direction, v(0.0, 0.0, 1.0));
         };
@@ -412,14 +423,16 @@ mod tests {
     fn shape_transformed_normal() {
         // computing the normal on a translated shape
         let mut s = test_shape();
-        s.transform = Matrix4x4::translation(0.0, 1.0, 0.0);
-        let n = s.normal_at(pt(0.0, 1.70711, -0.70711));
+        let mut mut_s = Rc::get_mut(&mut s).unwrap();
+        mut_s.transform = Matrix4x4::translation(0.0, 1.0, 0.0);
+        let n = mut_s.normal_at(pt(0.0, 1.70711, -0.70711));
         assert_eq!(n, v(0.0, 0.70711, -0.70711));
 
         // computing the normal on a transformed shape
         let mut s = test_shape();
-        s.transform = Matrix4x4::scaling(1.0, 0.5, 1.0) * Matrix4x4::rotation_z(PI / 5.0);
-        let n = s.normal_at(pt(0.0, 2.0_f64 / 2.0, -2.0_f64 / 2.0));
+        let mut mut_s = Rc::get_mut(&mut s).unwrap();
+        mut_s.transform = Matrix4x4::scaling(1.0, 0.5, 1.0) * Matrix4x4::rotation_z(PI / 5.0);
+        let n = mut_s.normal_at(pt(0.0, 2.0_f64 / 2.0, -2.0_f64 / 2.0));
         assert_eq!(n, v(0.0, 0.97014, -0.24254));
     }
 
@@ -428,7 +441,7 @@ mod tests {
         // a ray intersects a sphere at two points
         let r = Ray::new(pt(0.0, 0.0, -5.0), v(0.0, 0.0, 1.0));
         let s = sphere();
-        let xs = s.intersects(&r);
+        let xs = intersect(&s, &r);
         assert_eq!(xs.len(), 2);
         assert_eq!(xs[0].t, 4.0);
         assert_eq!(xs[0].object, sphere());
@@ -437,26 +450,26 @@ mod tests {
 
         // a ray intersects a sphere at a tangent
         let r = Ray::new(pt(0.0, 1.0, -5.0), v(0.0, 0.0, 1.0));
-        let xs = s.intersects(&r);
+        let xs = intersect(&s, &r);
         assert_eq!(xs.len(), 2);
         assert_eq!(xs[0].t, 5.0);
         assert_eq!(xs[1].t, 5.0);
 
         // a ray misses a sphere
         let r = Ray::new(pt(0.0, 2.0, -5.0), v(0.0, 0.0, 1.0));
-        let xs = s.intersects(&r);
+        let xs = intersect(&s, &r);
         assert_eq!(xs.len(), 0);
 
         // a ray originates inside a sphere
         let r = Ray::new(pt(0.0, 0.0, 0.0), v(0.0, 0.0, 1.0));
-        let xs = s.intersects(&r);
+        let xs = intersect(&s, &r);
         assert_eq!(xs.len(), 2);
         assert_eq!(xs[0].t, -1.0);
         assert_eq!(xs[1].t, 1.0);
 
         // a sphere is behind a ray
         let r = Ray::new(pt(0.0, 0.0, 5.0), v(0.0, 0.0, 1.0));
-        let xs = s.intersects(&r);
+        let xs = intersect(&s, &r);
         assert_eq!(xs.len(), 2);
         assert_eq!(xs[0].t, -6.0);
         assert_eq!(xs[1].t, -4.0);
@@ -467,24 +480,24 @@ mod tests {
         // intersect with a ray parallel to the plane
         let p = plane();
         let r = Ray::new(pt(0.0, 10.0, 0.0), v(0.0, 0.0, 1.0));
-        let xs = p.local_intersects(&r);
+        let xs = local_intersect(&p, &r);
         assert_eq!(xs.len(), 0);
 
         // intersect with a coplanar ray
         let r = Ray::new(pt(0.0, 0.0, 0.0), v(0.0, 0.0, 1.0));
-        let xs = p.local_intersects(&r);
+        let xs = local_intersect(&p, &r);
         assert_eq!(xs.len(), 0);
 
         // a ray intersecting a plane from above
         let r = Ray::new(pt(0.0, 1.0, 0.0), v(0.0, -1.0, 0.0));
-        let xs = p.local_intersects(&r);
+        let xs = local_intersect(&p, &r);
         assert_eq!(xs.len(), 1);
         assert_eq!(xs[0].t, 1.0);
         assert_eq!(xs[0].object, p);
 
         // a ray intersection a plane from below
         let r = Ray::new(pt(0.0, -1.0, 0.0), v(0.0, 1.0, 0.0));
-        let xs = p.local_intersects(&r);
+        let xs = local_intersect(&p, &r);
         assert_eq!(xs.len(), 1);
         assert_eq!(xs[0].t, 1.0);
         assert_eq!(xs[0].object, p);
@@ -495,14 +508,14 @@ mod tests {
         // intersecting a scaled sphere with a ray
         let r = Ray::new(pt(0.0, 0.0, -5.0), v(0.0, 0.0, 1.0));
         let s = spheret(Matrix4x4::scaling(2.0, 2.0, 2.0));
-        let xs = s.intersects(&r);
+        let xs = intersect(&s, &r);
         assert_eq!(xs.len(), 2);
         assert_eq!(xs[0].t, 3.0);
         assert_eq!(xs[1].t, 7.0);
 
         // intersecting a translated sphere with a ray
         let s = spheret(Matrix4x4::translation(5.0, 0.0, 0.0));
-        let xs = s.intersects(&r);
+        let xs = intersect(&s, &r);
         assert_eq!(xs.len(), 0);
     }
 
@@ -512,7 +525,7 @@ mod tests {
         fn test(origin: Tuple, direction: Tuple, t1: f64, t2: f64) {
             let c = cube();
             let r = Ray::new(origin, direction);
-            let xs = c.local_intersects(&r);
+            let xs = local_intersect(&c, &r);
             assert_eq!(xs.len(), 2);
             assert_eq!(xs[0].t, t1);
             assert_eq!(xs[1].t, t2);
@@ -535,7 +548,7 @@ mod tests {
         fn test_miss(origin: Tuple, direction: Tuple) {
             let c = cube();
             let r = Ray::new(origin, direction);
-            let xs = c.local_intersects(&r);
+            let xs = local_intersect(&c, &r);
             assert_eq!(xs.len(), 0);
         }
         test_miss(pt(-2.0, 0.0, 0.0), v(0.2673, 0.5345, 0.8018));
@@ -553,7 +566,7 @@ mod tests {
             let cyl = cylinder(std::f64::NEG_INFINITY, std::f64::INFINITY, false);
             let direction = direction.normalize();
             let r = Ray::new(origin, direction);
-            let xs = cyl.local_intersects(&r);
+            let xs = local_intersect(&cyl, &r);
             assert_eq!(xs.len(), 0, "{}", scenario);
         }
         test("one", pt(1.0, 0.0, 0.0), v(0.0, 1.0, 0.0));
@@ -567,7 +580,7 @@ mod tests {
             let cyl = cylinder(std::f64::NEG_INFINITY, std::f64::INFINITY, false);
             let direction = direction.normalize();
             let r = Ray::new(origin, direction);
-            let xs = cyl.local_intersects(&r);
+            let xs = local_intersect(&cyl, &r);
             assert_eq!(xs.len(), 2, "{}", scenario);
             assert_eq!(equal(xs[0].t, t0), true, "{}", scenario);
             assert_eq!(equal(xs[1].t, t1), true, "{}", scenario);
@@ -590,7 +603,7 @@ mod tests {
             let cyl = cylinder(1.0, 2.0, false);
             let direction = direction.normalize();
             let r = Ray::new(origin, direction);
-            let xs = cyl.local_intersects(&r);
+            let xs = local_intersect(&cyl, &r);
             assert_eq!(xs.len(), count, "{}", scenario);
         }
 
@@ -609,7 +622,7 @@ mod tests {
             let cyl = cylinder(1.0, 2.0, true);
             let direction = direction.normalize();
             let r = Ray::new(origin, direction);
-            let xs = cyl.intersects(&r);
+            let xs = intersect(&cyl, &r);
             assert_eq!(xs.len(), count, "{}", scenario);
         }
 
