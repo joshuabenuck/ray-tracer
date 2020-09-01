@@ -1,7 +1,7 @@
 use crate::{equal, pt, v, Intersection, Material, Matrix4x4, Ray, Tuple, EPSILON};
 use std::{cell::RefCell, fmt::Debug, rc::Rc};
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone)]
 pub enum ShapeForm {
     Sphere,
     Plane,
@@ -13,12 +13,25 @@ pub enum ShapeForm {
 
 impl Debug for ShapeForm {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        println!("shape form");
-        Ok(())
+        write!(f, "ShapeForm {{ }}")
     }
 }
 
-#[derive(Clone, PartialEq)]
+impl PartialEq for ShapeForm {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (ShapeForm::Sphere, ShapeForm::Sphere) => true,
+            (ShapeForm::Plane, ShapeForm::Plane) => true,
+            (ShapeForm::Cube, ShapeForm::Cube) => true,
+            (ShapeForm::Cylinder(..), ShapeForm::Cylinder(..)) => true,
+            (ShapeForm::Group(_), ShapeForm::Group(_)) => true,
+            (ShapeForm::Test, ShapeForm::Test) => true,
+            _ => false,
+        }
+    }
+}
+
+#[derive(Clone)]
 pub struct Shape {
     pub transform: Matrix4x4,
     pub material: Material,
@@ -28,8 +41,15 @@ pub struct Shape {
 
 impl Debug for Shape {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        println!("shape");
-        Ok(())
+        write!(f, "Shape {{ {:?} {:?} }}", self.transform, self.material)
+    }
+}
+
+impl PartialEq for Shape {
+    fn eq(&self, other: &Self) -> bool {
+        self.transform == other.transform
+            && self.material == other.material
+            && self.form == other.form
     }
 }
 
@@ -180,11 +200,10 @@ pub fn group() -> Rc<RefCell<Shape>> {
     }))
 }
 
-pub fn add_child(group: &mut Rc<RefCell<Shape>>, child: &mut Rc<RefCell<Shape>>) {
-    let mut c = child.borrow_mut();
-    c.parent = Some(group.clone());
+pub fn add_child(group: &Rc<RefCell<Shape>>, child: Rc<RefCell<Shape>>) {
     if let ShapeForm::Group(children) = &mut group.borrow_mut().form {
-        children.push(child.clone());
+        child.borrow_mut().parent = Some(group.clone());
+        children.push(child);
         return;
     }
     panic!("add_child may only be called on a group!");
@@ -259,7 +278,7 @@ pub fn intersect(shape: &Rc<RefCell<Shape>>, ray: &Ray) -> Vec<Intersection> {
 }
 
 pub fn local_intersect(shape: &Rc<RefCell<Shape>>, ray: &Ray) -> Vec<Intersection> {
-    match shape.borrow().form {
+    match &shape.borrow().form {
         ShapeForm::Test => {
             unsafe {
                 SAVED_RAY = Some(*ray);
@@ -341,34 +360,27 @@ pub fn local_intersect(shape: &Rc<RefCell<Shape>>, ray: &Ray) -> Vec<Intersectio
             let mut xs = Vec::new();
 
             let y0 = ray.origin.y + t0 * ray.direction.y;
-            if min < y0 && y0 < max {
+            if min < &y0 && &y0 < max {
                 xs.push(Intersection::new(t0, shape.clone()));
             }
 
             let y1 = ray.origin.y + t1 * ray.direction.y;
-            if min < y1 && y1 < max {
+            if min < &y1 && &y1 < max {
                 xs.push(Intersection::new(t1, shape.clone()));
             }
             intersect_caps(shape, ray, &mut xs);
             xs
         }
-        ShapeForm::Group(..) => Vec::new(),
+        ShapeForm::Group(children) => {
+            let mut xs: Vec<Intersection> =
+                children.iter().flat_map(|c| intersect(&c, &ray)).collect();
+            xs.sort_by(|a, b| a.t.partial_cmp(&b.t).unwrap());
+            xs
+        }
     }
 }
 
 impl Shape {
-    pub fn normal_at(&self, world_point: Tuple) -> Tuple {
-        let object_point = self.transform.inverse().unwrap() * world_point;
-        let object_normal = self.local_normal_at(object_point);
-        // technically should be self.tranform.submatrix(3, 3)
-        // to avoid messing with the w coordinate when there is any kind of translation
-        // in the transform
-        let mut world_normal = self.transform.inverse().unwrap().transpose() * object_normal;
-        // workaround to avoid the submatrix calculation
-        world_normal.w = 0.0;
-        world_normal.normalize()
-    }
-
     pub fn local_normal_at(&self, local_point: Tuple) -> Tuple {
         match self.form {
             ShapeForm::Test => v(local_point.x, local_point.y, local_point.z),
@@ -400,9 +412,37 @@ impl Shape {
                 }
                 v(local_point.x, 0.0, local_point.z)
             }
-            ShapeForm::Group(..) => v(0.0, 0.0, 0.0),
+            ShapeForm::Group(..) => unreachable!(),
         }
     }
+}
+
+pub fn normal_at(shape: &Rc<RefCell<Shape>>, world_point: Tuple) -> Tuple {
+    let object_point = world_to_object(&shape, world_point);
+    let object_normal = shape.borrow().local_normal_at(object_point);
+    normal_to_world(&shape, object_normal)
+}
+
+pub fn world_to_object(shape: &Rc<RefCell<Shape>>, point: Tuple) -> Tuple {
+    let mut point = point;
+    let shape = shape.borrow();
+    if let Some(parent) = &shape.parent {
+        point = world_to_object(&parent, point);
+    }
+    shape.transform.inverse().unwrap() * point
+}
+
+pub fn normal_to_world(shape: &Rc<RefCell<Shape>>, normal: Tuple) -> Tuple {
+    let shape = shape.borrow();
+    let mut normal = shape.transform.inverse().unwrap().transpose() * normal;
+    normal.w = 0.0;
+    normal = normal.normalize();
+
+    if let Some(parent) = &shape.parent {
+        normal = normal_to_world(&parent, normal);
+    }
+
+    normal
 }
 
 #[cfg(test)]
@@ -477,25 +517,21 @@ mod tests {
     fn group_add_children() {
         // adding a child to a group
         let mut g = group();
-        let mut s = test_shape();
-        add_child(&mut g, &mut s);
+        let s = test_shape();
+        add_child(&mut g, s.clone());
         let children = children(&g);
         assert_eq!(children.len(), 1);
-        // assert!(children.iter().any(|e| e == &s));
-        // assert_eq!(s.borrow().parent.is_some(), true);
-        // assert_eq!(s.borrow().parent.as_ref().unwrap(), &g);
-        for c in children.iter() {
-            println!("{:?}", c);
-        }
-        // s.borrow().parent.is_some();
-        // s.borrow().parent.as_ref().unwrap();
+        assert!(children.iter().any(|e| e == &s));
+        let s = s.borrow();
+        assert!(s.parent.is_some());
+        assert_eq!(s.parent.as_ref().unwrap(), &g);
     }
 
     #[test]
     fn shape_parent() {
         // a shape has a parent attribute
         let s = test_shape();
-        assert_eq!(s.borrow().parent, None);
+        assert!(s.borrow().parent == None);
     }
 
     #[test]
@@ -503,16 +539,14 @@ mod tests {
         // computing the normal on a translated shape
         let s = test_shape();
         s.borrow_mut().transform = Matrix4x4::translation(0.0, 1.0, 0.0);
-        let n = s.borrow_mut().normal_at(pt(0.0, 1.70711, -0.70711));
+        let n = normal_at(&s, pt(0.0, 1.70711, -0.70711));
         assert_eq!(n, v(0.0, 0.70711, -0.70711));
 
         // computing the normal on a transformed shape
         let s = test_shape();
         s.borrow_mut().transform =
             Matrix4x4::scaling(1.0, 0.5, 1.0) * Matrix4x4::rotation_z(PI / 5.0);
-        let n = s
-            .borrow_mut()
-            .normal_at(pt(0.0, 2.0_f64 / 2.0, -2.0_f64 / 2.0));
+        let n = normal_at(&s, pt(0.0, 2.0_f64 / 2.0, -2.0_f64 / 2.0));
         assert_eq!(n, v(0.0, 0.97014, -0.24254));
     }
 
@@ -524,9 +558,9 @@ mod tests {
         let xs = intersect(&s, &r);
         assert_eq!(xs.len(), 2);
         assert_eq!(xs[0].t, 4.0);
-        assert_eq!(xs[0].object, sphere());
+        assert!(xs[0].object == sphere());
         assert_eq!(xs[1].t, 6.0);
-        assert_eq!(xs[1].object, sphere());
+        assert!(xs[1].object == sphere());
 
         // a ray intersects a sphere at a tangent
         let r = Ray::new(pt(0.0, 1.0, -5.0), v(0.0, 0.0, 1.0));
@@ -573,14 +607,14 @@ mod tests {
         let xs = local_intersect(&p, &r);
         assert_eq!(xs.len(), 1);
         assert_eq!(xs[0].t, 1.0);
-        assert_eq!(xs[0].object, p);
+        assert!(xs[0].object == p);
 
         // a ray intersection a plane from below
         let r = Ray::new(pt(0.0, -1.0, 0.0), v(0.0, 1.0, 0.0));
         let xs = local_intersect(&p, &r);
         assert_eq!(xs.len(), 1);
         assert_eq!(xs[0].t, 1.0);
-        assert_eq!(xs[0].object, p);
+        assert!(xs[0].object == p);
     }
 
     #[test]
@@ -653,6 +687,7 @@ mod tests {
         test("two", pt(0.0, 0.0, 0.0), v(0.0, 1.0, 0.0));
         test("three", pt(0.0, 0.0, -5.0), v(1.0, 1.0, 1.0));
     }
+
     #[test]
     fn ray_intersection_with_cylinder_hits() {
         // a ray strikes a cylinder
@@ -716,26 +751,70 @@ mod tests {
     }
 
     #[test]
+    fn ray_intersection_with_empty_group() {
+        // intersecting a ray with an empty group
+        let g = group();
+        let r = Ray::new(pt(0.0, 0.0, 0.0), v(0.0, 0.0, 1.0));
+        let xs = local_intersect(&g, &r);
+        assert_eq!(xs.len(), 0);
+    }
+
+    #[test]
+    fn ray_intersection_with_non_empty_group() {
+        // intersecting a ray with a non-empty group
+        let mut g = group();
+        let s1 = sphere();
+        let s2 = spheret(Matrix4x4::translation(0.0, 0.0, -3.0));
+        let s3 = spheret(Matrix4x4::translation(5.0, 0.0, 0.0));
+        add_child(&mut g, s1.clone());
+        add_child(&mut g, s2.clone());
+        add_child(&mut g, s3.clone());
+        let r = Ray::new(pt(0.0, 0.0, -5.0), v(0.0, 0.0, 1.0));
+        let xs = local_intersect(&g, &r);
+        assert_eq!(children(&g).len(), 3);
+        assert_eq!(xs.len(), 4);
+        assert_eq!(xs[0].object, s2);
+        assert_eq!(xs[1].object, s2);
+        assert_eq!(xs[2].object, s1);
+        assert_eq!(xs[3].object, s1);
+    }
+
+    #[test]
+    fn ray_intersection_with_transformed_group() {
+        // intersecting a transformed group
+        let g = group();
+        g.borrow_mut().transform = Matrix4x4::scaling(2.0, 2.0, 2.0);
+        let s = spheret(Matrix4x4::translation(5.0, 0.0, 0.0));
+        add_child(&g, s.clone());
+        let r = Ray::new(pt(10.0, 0.0, -10.0), v(0.0, 0.0, 1.0));
+        let xs = intersect(&g, &r);
+        assert_eq!(xs.len(), 2);
+    }
+
+    #[test]
     fn sphere_normal_at() {
         // the normal on a sphere at a point on the x axis
         let s = sphere();
-        let n = s.borrow().normal_at(pt(1.0, 0.0, 0.0));
+        let n = normal_at(&s, pt(1.0, 0.0, 0.0));
         assert_eq!(n, v(1.0, 0.0, 0.0));
 
         // the normal on a sphere at a point on the y axis
-        let n = s.borrow().normal_at(pt(0.0, 1.0, 0.0));
+        let n = normal_at(&s, pt(0.0, 1.0, 0.0));
         assert_eq!(n, v(0.0, 1.0, 0.0));
 
         // the normal on a sphere at a point on the y axis
-        let n = s.borrow().normal_at(pt(0.0, 0.0, 1.0));
+        let n = normal_at(&s, pt(0.0, 0.0, 1.0));
         assert_eq!(n, v(0.0, 0.0, 1.0));
 
         // the normal on a sphere at a point on a nonaxial point
-        let n = s.borrow().normal_at(pt(
-            3.0_f64.sqrt() / 3.0,
-            3.0_f64.sqrt() / 3.0,
-            3.0_f64.sqrt() / 3.0,
-        ));
+        let n = normal_at(
+            &s,
+            pt(
+                3.0_f64.sqrt() / 3.0,
+                3.0_f64.sqrt() / 3.0,
+                3.0_f64.sqrt() / 3.0,
+            ),
+        );
         assert_eq!(
             n,
             v(
@@ -753,9 +832,9 @@ mod tests {
     fn plane_normal_at() {
         // the normal of a plane is constant everywhere
         let p = plane();
-        let n1 = p.borrow().normal_at(pt(0.0, 0.0, 0.0));
-        let n2 = p.borrow().normal_at(pt(10.0, 0.0, -10.0));
-        let n3 = p.borrow().normal_at(pt(-5.0, 0.0, 150.0));
+        let n1 = normal_at(&p, pt(0.0, 0.0, 0.0));
+        let n2 = normal_at(&p, pt(10.0, 0.0, -10.0));
+        let n3 = normal_at(&p, pt(-5.0, 0.0, 150.0));
         assert_eq!(n1, v(0.0, 1.0, 0.0));
         assert_eq!(n2, v(0.0, 1.0, 0.0));
         assert_eq!(n3, v(0.0, 1.0, 0.0));
@@ -766,7 +845,7 @@ mod tests {
         // the normal of the surface of a cube
         fn test(point: Tuple, normal: Tuple) {
             let c = cube();
-            let n = c.borrow().normal_at(point);
+            let n = normal_at(&c, point);
             assert_eq!(n, normal);
         }
 
@@ -810,5 +889,54 @@ mod tests {
         test(pt(0.0, 2.0, 0.0), v(0.0, 1.0, 0.0));
         test(pt(0.5, 2.0, 0.0), v(0.0, 1.0, 0.0));
         test(pt(0.0, 2.0, 0.5), v(0.0, 1.0, 0.0));
+    }
+
+    #[test]
+    fn world_to_object_space() {
+        // converting a point from world to object space
+        let g1 = group();
+        g1.borrow_mut().transform = Matrix4x4::rotation_y(PI / 2.0);
+        let g2 = group();
+        g2.borrow_mut().transform = Matrix4x4::scaling(2.0, 2.0, 2.0);
+        let s = spheret(Matrix4x4::translation(5.0, 0.0, 0.0));
+        add_child(&g2, s.clone());
+        add_child(&g1, g2);
+        let p = world_to_object(&s, pt(-2.0, 0.0, -10.0));
+        assert_eq!(p, pt(0.0, 0.0, -1.0));
+    }
+
+    #[test]
+    fn normal_from_object_to_world_space() {
+        // converting a normal from object to world space
+        let g1 = group();
+        g1.borrow_mut().transform = Matrix4x4::rotation_y(PI / 2.0);
+        let g2 = group();
+        g2.borrow_mut().transform = Matrix4x4::scaling(1.0, 2.0, 3.0);
+        let s = spheret(Matrix4x4::translation(5.0, 0.0, 0.0));
+        add_child(&g2, s.clone());
+        add_child(&g1, g2);
+        let n = normal_to_world(
+            &s,
+            v(
+                3.0_f64.sqrt() / 3.0,
+                3.0_f64.sqrt() / 3.0,
+                3.0_f64.sqrt() / 3.0,
+            ),
+        );
+        assert_eq!(n, v(0.28571, 0.42857, -0.85714));
+    }
+
+    #[test]
+    fn normal_on_child_object() {
+        // finding the normal on a child object
+        let g1 = group();
+        g1.borrow_mut().transform = Matrix4x4::rotation_y(PI / 2.0);
+        let g2 = group();
+        g2.borrow_mut().transform = Matrix4x4::scaling(1.0, 2.0, 3.0);
+        let s = spheret(Matrix4x4::translation(5.0, 0.0, 0.0));
+        add_child(&g2, s.clone());
+        add_child(&g1, g2);
+        let n = normal_at(&s, pt(1.7321, 1.1547, -5.5774));
+        assert_eq!(n, v(0.2857, 0.42854, -0.85716));
     }
 }

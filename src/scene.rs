@@ -1,6 +1,6 @@
 use crate::{
-    intersect, pt, schlick, spherem, spheret, Canvas, Color, Comps, Intersection, Intersections,
-    Material, Matrix4x4, PointLight, Ray, Shape, Tuple,
+    intersect, lighting, pt, schlick, spherem, spheret, Canvas, Color, Comps, Intersection,
+    Intersections, Material, Matrix4x4, PointLight, Ray, Shape, Tuple,
 };
 use std::{cell::RefCell, rc::Rc};
 
@@ -28,8 +28,10 @@ impl World {
 
     pub fn shade_hit(&self, comps: &Comps, remaining: usize) -> Color {
         let mut cs = self.lights.iter().map(|l| {
-            let surface = comps.object.borrow().material.lighting(
-                &comps.object.borrow(),
+            let object = comps.object.borrow();
+            let surface = lighting(
+                &object.material,
+                &comps.object,
                 &l,
                 &comps.over_point,
                 &comps.eyev,

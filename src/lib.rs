@@ -8,7 +8,7 @@ mod shape;
 mod tuple;
 
 pub use intersection::{schlick, Comps, Intersection, Intersections};
-pub use material::{m, Material};
+pub use material::{lighting, m, Material};
 pub use matrix::{id, Matrix2x2, Matrix3x3, Matrix4x4};
 pub use pattern::{
     checkers_pattern, gradient_pattern, ring_pattern, stripe_pattern, stripe_patternt,
@@ -17,9 +17,9 @@ pub use pattern::{
 pub use ray::{PointLight, Ray};
 pub use scene::{view_transform, Camera, World};
 pub use shape::{
-    cube, cubem, cubet, cubetm, cylinder, cylinderm, cylindert, cylindertm, glass_sphere,
-    glass_spheret, intersect, plane, planem, planet, planetm, sphere, spherem, spheret, spheretm,
-    test_shape, Shape,
+    add_child, cube, cubem, cubet, cubetm, cylinder, cylinderm, cylindert, cylindertm,
+    glass_sphere, glass_spheret, group, intersect, normal_at, plane, planem, planet, planetm,
+    sphere, spherem, spheret, spheretm, test_shape, world_to_object, Shape,
 };
 pub use tuple::{black, pt, v, white, Canvas, Color, Tuple};
 

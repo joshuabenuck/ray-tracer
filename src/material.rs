@@ -1,4 +1,6 @@
 use crate::{Color, Pattern, PointLight, Shape, Tuple};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 pub fn m() -> Material {
     Material::new()
@@ -76,60 +78,60 @@ impl Material {
         self.refractive_index = refractive_index;
         self
     }
+}
 
-    pub fn lighting(
-        &self,
-        object: &Shape,
-        light: &PointLight,
-        point: &Tuple,
-        eyev: &Tuple,
-        normalv: &Tuple,
-        in_shadow: bool,
-    ) -> Color {
-        let color = if let Some(pattern) = self.pattern {
-            pattern.pattern_at_object(object, *point)
-        } else {
-            self.color
-        };
-        // combine the surface color with the light's color / intensity
-        let effective_color = color * light.intensity;
+pub fn lighting(
+    material: &Material,
+    object: &Rc<RefCell<Shape>>,
+    light: &PointLight,
+    point: &Tuple,
+    eyev: &Tuple,
+    normalv: &Tuple,
+    in_shadow: bool,
+) -> Color {
+    let color = if let Some(pattern) = &material.pattern {
+        pattern.pattern_at_object(object, *point)
+    } else {
+        material.color
+    };
+    // combine the surface color with the light's color / intensity
+    let effective_color = color * light.intensity;
 
-        // find the direction to the light source
-        let lightv = (light.position - *point).normalize();
+    // find the direction to the light source
+    let lightv = (light.position - *point).normalize();
 
-        // comput the ambient contribution
-        let ambient = effective_color * self.ambient;
-        if in_shadow {
-            return ambient;
-        }
-
-        // light_dot_normal represents the cosine of the angle between the
-        // light vector and the normal vector. A negative number means the
-        // light is on the other side of teh surface.
-        let light_dot_normal = lightv.dot(&normalv);
-        let (diffuse, specular) = if light_dot_normal < 0.0 {
-            (Color::new(0.0, 0.0, 0.0), Color::new(0.0, 0.0, 0.0))
-        } else {
-            // compute the diffuse contribution
-            let diffuse = effective_color * self.diffuse * light_dot_normal;
-
-            // reflect-dot_eye represents the cosine of the angle between the
-            // reflection vector and the eye vector. A negative number means the
-            // light reflects away from the eye.
-            let reflectv = -lightv.reflect(&normalv);
-            let reflect_dot_eye = reflectv.dot(eyev);
-
-            let specular = if reflect_dot_eye <= 0.0 {
-                Color::new(0.0, 0.0, 0.0)
-            } else {
-                // compute the specular contribution
-                let factor = reflect_dot_eye.powf(self.shininess);
-                light.intensity * self.specular * factor
-            };
-            (diffuse, specular)
-        };
-        ambient + diffuse + specular
+    // comput the ambient contribution
+    let ambient = effective_color * material.ambient;
+    if in_shadow {
+        return ambient;
     }
+
+    // light_dot_normal represents the cosine of the angle between the
+    // light vector and the normal vector. A negative number means the
+    // light is on the other side of teh surface.
+    let light_dot_normal = lightv.dot(&normalv);
+    let (diffuse, specular) = if light_dot_normal < 0.0 {
+        (Color::new(0.0, 0.0, 0.0), Color::new(0.0, 0.0, 0.0))
+    } else {
+        // compute the diffuse contribution
+        let diffuse = effective_color * material.diffuse * light_dot_normal;
+
+        // reflect-dot_eye represents the cosine of the angle between the
+        // reflection vector and the eye vector. A negative number means the
+        // light reflects away from the eye.
+        let reflectv = -lightv.reflect(&normalv);
+        let reflect_dot_eye = reflectv.dot(eyev);
+
+        let specular = if reflect_dot_eye <= 0.0 {
+            Color::new(0.0, 0.0, 0.0)
+        } else {
+            // compute the specular contribution
+            let factor = reflect_dot_eye.powf(material.shininess);
+            light.intensity * material.specular * factor
+        };
+        (diffuse, specular)
+    };
+    ambient + diffuse + specular
 }
 
 #[cfg(test)]
@@ -156,7 +158,7 @@ mod tests {
     }
 
     #[test]
-    fn lighting() {
+    fn lighting_() {
         let m = Material::new();
         let position = pt(0.0, 0.0, 0.0);
 
@@ -165,67 +167,32 @@ mod tests {
         let eyev = v(0.0, 0.0, -1.0);
         let normalv = v(0.0, 0.0, -1.0);
         let light = PointLight::new(pt(0.0, 0.0, -10.0), Color::new(1.0, 1.0, 1.0));
-        let result = m.lighting(
-            &sphere().borrow(),
-            &light,
-            &position,
-            &eyev,
-            &normalv,
-            false,
-        );
+        let result = lighting(&m, &sphere(), &light, &position, &eyev, &normalv, false);
         assert_eq!(result, Color::new(1.9, 1.9, 1.9));
 
         // lighting with the surface in shadow
         let in_shadow = true;
-        let result = m.lighting(
-            &sphere().borrow(),
-            &light,
-            &position,
-            &eyev,
-            &normalv,
-            in_shadow,
-        );
+        let result = lighting(&m, &sphere(), &light, &position, &eyev, &normalv, in_shadow);
         assert_eq!(result, Color::new(0.1, 0.1, 0.1));
 
         // lighting with the eye between light and surface, eye offset 45 degrees
         // ambient and diffuse unchanged because the angle between them is unchanged
         // specular drops off to effectively zero
         let eyev = v(0.0, 2.0_f64.sqrt() / 2.0, 2.0_f64.sqrt() / 2.0);
-        let result = m.lighting(
-            &sphere().borrow(),
-            &light,
-            &position,
-            &eyev,
-            &normalv,
-            false,
-        );
+        let result = lighting(&m, &sphere(), &light, &position, &eyev, &normalv, false);
         assert_eq!(result, Color::new(1.0, 1.0, 1.0));
 
         // lighting with eye opposite surface, light offset 45 degrees
         let eyev = v(0.0, 0.0, -1.0);
         let light = PointLight::new(pt(0.0, 10.0, -10.0), Color::new(1.0, 1.0, 1.0));
-        let result = m.lighting(
-            &sphere().borrow(),
-            &light,
-            &position,
-            &eyev,
-            &normalv,
-            false,
-        );
+        let result = lighting(&m, &sphere(), &light, &position, &eyev, &normalv, false);
         assert_eq!(result, Color::new(0.7364, 0.7364, 0.7364));
 
         // lighting with eye in the path of the reflection vector
         // makes specular at full strength with ambient and diffuse same as last test
         let eyev = v(0.0, -2.0_f64.sqrt() / 2.0, -2.0_f64.sqrt() / 2.0);
         let light = PointLight::new(pt(0.0, 10.0, -10.0), Color::new(1.0, 1.0, 1.0));
-        let result = m.lighting(
-            &sphere().borrow(),
-            &light,
-            &position,
-            &eyev,
-            &normalv,
-            false,
-        );
+        let result = lighting(&m, &sphere(), &light, &position, &eyev, &normalv, false);
         assert_eq!(result, Color::new(1.6364, 1.6364, 1.6364,));
 
         // light with the light behind the surface
@@ -234,14 +201,7 @@ mod tests {
         // The total intensity should be the same as the ambient component
         let eyev = v(0.0, 0.0, -1.0);
         let light = PointLight::new(pt(0.0, 0.0, 10.0), Color::new(1.0, 1.0, 1.0));
-        let result = m.lighting(
-            &sphere().borrow(),
-            &light,
-            &position,
-            &eyev,
-            &normalv,
-            false,
-        );
+        let result = lighting(&m, &sphere(), &light, &position, &eyev, &normalv, false);
         assert_eq!(result, Color::new(0.1, 0.1, 0.1));
     }
 
@@ -256,16 +216,18 @@ mod tests {
         let eyev = v(0.0, 0.0, -1.0);
         let normalv = v(0.0, 0.0, -1.0);
         let light = PointLight::new(pt(0.0, 0.0, -10.0), white());
-        let c1 = m.lighting(
-            &sphere().borrow(),
+        let c1 = lighting(
+            &m,
+            &sphere(),
             &light,
             &pt(0.9, 0.0, 0.0),
             &eyev,
             &normalv,
             false,
         );
-        let c2 = m.lighting(
-            &sphere().borrow(),
+        let c2 = lighting(
+            &m,
+            &sphere(),
             &light,
             &pt(1.1, 0.0, 0.0),
             &eyev,

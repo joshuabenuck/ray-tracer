@@ -1,4 +1,4 @@
-use crate::{Ray, Shape, Tuple, EPSILON};
+use crate::{normal_at, Ray, Shape, Tuple, EPSILON};
 use std::{cell::RefCell, rc::Rc};
 
 pub fn schlick(comps: &Comps) -> f64 {
@@ -38,7 +38,7 @@ pub struct Comps {
     pub n2: f64,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct Intersection {
     pub t: f64,
     pub object: Rc<RefCell<Shape>>,
@@ -57,7 +57,7 @@ impl Intersection {
         // precompute some useful values
         let point = ray.position(t);
         let eyev = -ray.direction;
-        let normalv = object.borrow().normal_at(point);
+        let normalv = normal_at(&object, point);
         let inside = normalv.dot(&eyev) < 0.0;
         let normalv = if inside { -normalv } else { normalv };
         let reflectv = ray.direction.reflect(&normalv);
@@ -168,7 +168,7 @@ mod tests {
         let mut xs = vec![i2.clone(), i1.clone()];
         xs.sort_by(|a, b| a.t.partial_cmp(&b.t).unwrap());
         let i = xs.hit();
-        assert_eq!(*i.unwrap(), i1);
+        assert!(*i.unwrap() == i1);
 
         // the hit when intersections have negative t
         let i1 = Intersection::new(-1.0, s.clone());
@@ -176,7 +176,7 @@ mod tests {
         let mut xs = vec![i2.clone(), i1.clone()];
         xs.sort_by(|a, b| a.t.partial_cmp(&b.t).unwrap());
         let i = xs.hit();
-        assert_eq!(*i.unwrap(), i2);
+        assert!(*i.unwrap() == i2);
 
         // the hit when all intersections have negative t
         let i1 = Intersection::new(-2.0, s.clone());
@@ -184,7 +184,7 @@ mod tests {
         let mut xs = vec![i2, i1];
         xs.sort_by(|a, b| a.t.partial_cmp(&b.t).unwrap());
         let i = xs.hit();
-        assert_eq!(i, None);
+        assert!(i == None);
 
         // the hit is always the lowest non-negative intersection
         let i1 = Intersection::new(5.0, s.clone());
@@ -194,7 +194,7 @@ mod tests {
         let mut xs = vec![i1, i2, i3, i4.clone()];
         xs.sort_by(|a, b| a.t.partial_cmp(&b.t).unwrap());
         let i = xs.hit();
-        assert_eq!(*i.unwrap(), i4);
+        assert!(*i.unwrap() == i4);
     }
 
     #[test]
