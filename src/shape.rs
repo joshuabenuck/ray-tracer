@@ -8,6 +8,7 @@ pub enum ShapeForm {
     Cube,
     Cylinder(f64, f64, bool),
     Group(Vec<Rc<RefCell<Shape>>>),
+    Triangle { p1: Tuple, p2: Tuple, p3: Tuple },
     Test,
 }
 
@@ -216,6 +217,16 @@ pub fn children(group: &Rc<RefCell<Shape>>) -> Vec<Rc<RefCell<Shape>>> {
     panic!("children may only be called on a group!");
 }
 
+#[inline]
+pub fn triangle(p1: Tuple, p2: Tuple, p3: Tuple) -> Rc<RefCell<Shape>> {
+    Rc::new(RefCell::new(Shape {
+        transform: Matrix4x4::identity(),
+        material: Material::new(),
+        form: ShapeForm::Triangle { p1, p2, p3 },
+        parent: None,
+    }))
+}
+
 fn check_axis(origin: f64, direction: f64) -> (f64, f64) {
     let tmin_numerator = -1.0 - origin;
     let tmax_numerator = 1.0 - origin;
@@ -377,6 +388,7 @@ pub fn local_intersect(shape: &Rc<RefCell<Shape>>, ray: &Ray) -> Vec<Intersectio
             xs.sort_by(|a, b| a.t.partial_cmp(&b.t).unwrap());
             xs
         }
+        ShapeForm::Triangle { p1, p2, p3 } => Vec::new(),
     }
 }
 
@@ -413,6 +425,7 @@ impl Shape {
                 v(local_point.x, 0.0, local_point.z)
             }
             ShapeForm::Group(..) => unreachable!(),
+            ShapeForm::Triangle { .. } => unreachable!(),
         }
     }
 }
