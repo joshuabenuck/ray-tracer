@@ -1,4 +1,4 @@
-use crate::{equal, v, Intersection, Material, Matrix4x4, Ray, Tuple, EPSILON};
+use crate::{Intersection, Material, Matrix4x4, Ray, Tuple};
 use std::any::Any;
 use std::fmt::Debug;
 
@@ -100,17 +100,6 @@ pub trait Shape {
     }
 }
 
-#[derive(PartialEq)]
-pub struct TestShape {
-    props: Props,
-}
-
-impl TestShape {
-    fn as_shape(&self) -> &dyn Shape {
-        self
-    }
-}
-
 impl Debug for dyn Shape + '_ {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -136,14 +125,6 @@ impl PartialEq for dyn Shape + '_ {
 //     }
 // }
 
-static mut SAVED_RAY: Option<Ray> = None;
-
-pub fn test_shape() -> TestShape {
-    TestShape {
-        props: Props::default(),
-    }
-}
-
 // #[inline]
 // pub fn group<'a>() -> Group<'a> {
 //     Group {
@@ -168,38 +149,6 @@ pub fn triangle(p1: Tuple, p2: Tuple, p3: Tuple) -> Triangle {
         p1,
         p2,
         p3,
-    }
-}
-
-impl Shape for TestShape {
-    fn local_intersect(&'_ self, ray: &Ray) -> Vec<Intersection<'_>> {
-        unsafe {
-            SAVED_RAY = Some(*ray);
-        }
-        Vec::new()
-    }
-
-    fn local_normal_at(&self, local_point: Tuple) -> Tuple {
-        v(local_point.x, local_point.y, local_point.z)
-    }
-
-    fn common(&self) -> &Props {
-        &self.props
-    }
-
-    fn common_mut(&mut self) -> &mut Props {
-        &mut self.props
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn shape_eq(&self, other: &dyn Any) -> bool {
-        match other.downcast_ref::<Self>() {
-            Some(_) => true,
-            None => false,
-        }
     }
 }
 
@@ -265,13 +214,60 @@ impl<'a> From<Triangle> for Box<dyn Shape + 'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::pt;
+    use crate::{pt, v};
     use std::f64::consts::PI;
+
+    static mut SAVED_RAY: Option<Ray> = None;
+
+    #[derive(PartialEq)]
+    pub struct TestShape {
+        props: Props,
+    }
+
+    impl TestShape {
+        fn new() -> TestShape {
+            TestShape {
+                props: Props::default(),
+            }
+        }
+    }
+
+    impl Shape for TestShape {
+        fn local_intersect(&'_ self, ray: &Ray) -> Vec<Intersection<'_>> {
+            unsafe {
+                SAVED_RAY = Some(*ray);
+            }
+            Vec::new()
+        }
+
+        fn local_normal_at(&self, local_point: Tuple) -> Tuple {
+            v(local_point.x, local_point.y, local_point.z)
+        }
+
+        fn common(&self) -> &Props {
+            &self.props
+        }
+
+        fn common_mut(&mut self) -> &mut Props {
+            &mut self.props
+        }
+
+        fn as_any(&self) -> &dyn Any {
+            self
+        }
+
+        fn shape_eq(&self, other: &dyn Any) -> bool {
+            match other.downcast_ref::<Self>() {
+                Some(_) => true,
+                None => false,
+            }
+        }
+    }
 
     #[test]
     fn shape_operations() {
         // the default transformation
-        let mut s = test_shape();
+        let mut s = TestShape::new();
         assert_eq!(s.transform(), &Matrix4x4::identity());
 
         // assigning a transformation
@@ -290,7 +286,7 @@ mod tests {
 
         // intersecting a scaled shape with a ray
         let r = Ray::new(pt(0.0, 0.0, -5.0), v(0.0, 0.0, 1.0));
-        let mut s = test_shape();
+        let mut s = TestShape::new();
         s.set_transform(Matrix4x4::scaling(2.0, 2.0, 2.0));
         unsafe {
             SAVED_RAY = None;
@@ -334,7 +330,7 @@ mod tests {
     #[test]
     fn shape_parent() {
         // a shape has a parent attribute
-        let s = test_shape();
+        let s = TestShape::new();
         // assert!(s.parent == None);
     }
 
@@ -353,13 +349,13 @@ mod tests {
     #[test]
     fn shape_transformed_normal() {
         // computing the normal on a translated shape
-        let mut s = test_shape();
+        let mut s = TestShape::new();
         s.set_transform(Matrix4x4::translation(0.0, 1.0, 0.0));
         let n = s.normal_at(pt(0.0, 1.70711, -0.70711));
         assert_eq!(n, v(0.0, 0.70711, -0.70711));
 
         // computing the normal on a transformed shape
-        let mut s = test_shape();
+        let mut s = TestShape::new();
         s.set_transform(Matrix4x4::scaling(1.0, 0.5, 1.0) * Matrix4x4::rotation_z(PI / 5.0));
         let n = s.normal_at(pt(0.0, 2.0_f64 / 2.0, -2.0_f64 / 2.0));
         assert_eq!(n, v(0.0, 0.97014, -0.24254));

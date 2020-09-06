@@ -17,7 +17,7 @@ pub use pattern::{
 };
 pub use ray::{PointLight, Ray};
 pub use scene::{view_transform, Camera, World};
-pub use shape::{test_shape, Props, Shape};
+pub use shape::{Props, Shape};
 pub use shapes::{Cube, Cylinder, Plane, Sphere};
 pub use tuple::{black, pt, v, white, Canvas, Color, Tuple};
 
