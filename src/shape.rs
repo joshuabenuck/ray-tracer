@@ -1,4 +1,4 @@
-use crate::{equal, pt, v, Intersection, Material, Matrix4x4, Ray, Tuple, EPSILON};
+use crate::{equal, v, Intersection, Material, Matrix4x4, Ray, Tuple, EPSILON};
 use std::any::Any;
 use std::fmt::Debug;
 
@@ -31,10 +31,6 @@ impl Debug for Props {
     }
 }
 
-#[derive(PartialEq, Debug)]
-pub struct Plane {
-    props: Props,
-}
 #[derive(PartialEq, Debug)]
 pub struct Cube {
     props: Props,
@@ -157,34 +153,6 @@ static mut SAVED_RAY: Option<Ray> = None;
 pub fn test_shape() -> TestShape {
     TestShape {
         props: Props::default(),
-    }
-}
-
-#[inline]
-pub fn plane() -> Plane {
-    Plane {
-        props: Props::default(),
-    }
-}
-
-#[inline]
-pub fn planet(transform: Matrix4x4) -> Plane {
-    planetm(transform, Material::new())
-}
-
-#[inline]
-pub fn planem(material: Material) -> Plane {
-    planetm(Matrix4x4::identity(), material)
-}
-
-#[inline]
-pub fn planetm(transform: Matrix4x4, material: Material) -> Plane {
-    Plane {
-        props: Props {
-            transform,
-            material,
-            ..Props::default()
-        },
     }
 }
 
@@ -338,40 +306,6 @@ impl Shape for TestShape {
 
     fn local_normal_at(&self, local_point: Tuple) -> Tuple {
         v(local_point.x, local_point.y, local_point.z)
-    }
-
-    fn common(&self) -> &Props {
-        &self.props
-    }
-
-    fn common_mut(&mut self) -> &mut Props {
-        &mut self.props
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn shape_eq(&self, other: &dyn Any) -> bool {
-        match other.downcast_ref::<Self>() {
-            Some(_) => true,
-            None => false,
-        }
-    }
-}
-
-impl Shape for Plane {
-    fn local_intersect(&'_ self, ray: &Ray) -> Vec<Intersection<'_>> {
-        if ray.direction.y.abs() < EPSILON {
-            Vec::new()
-        } else {
-            let t = -ray.origin.y / ray.direction.y;
-            vec![Intersection::new(t, self)]
-        }
-    }
-
-    fn local_normal_at(&self, _local_point: Tuple) -> Tuple {
-        v(0.0, 1.0, 0.0)
     }
 
     fn common(&self) -> &Props {
@@ -586,15 +520,10 @@ impl<'a> From<Cube> for Box<dyn Shape + 'a> {
     }
 }
 
-impl<'a> From<Plane> for Box<dyn Shape + 'a> {
-    fn from(value: Plane) -> Box<dyn Shape + 'a> {
-        Box::new(value)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::pt;
     use std::f64::consts::PI;
 
     #[test]
@@ -692,34 +621,6 @@ mod tests {
         s.set_transform(Matrix4x4::scaling(1.0, 0.5, 1.0) * Matrix4x4::rotation_z(PI / 5.0));
         let n = s.normal_at(pt(0.0, 2.0_f64 / 2.0, -2.0_f64 / 2.0));
         assert_eq!(n, v(0.0, 0.97014, -0.24254));
-    }
-
-    #[test]
-    fn ray_plane_intersection() {
-        // intersect with a ray parallel to the plane
-        let p = plane();
-        let r = Ray::new(pt(0.0, 10.0, 0.0), v(0.0, 0.0, 1.0));
-        let xs = p.local_intersect(&r);
-        assert_eq!(xs.len(), 0);
-
-        // intersect with a coplanar ray
-        let r = Ray::new(pt(0.0, 0.0, 0.0), v(0.0, 0.0, 1.0));
-        let xs = p.local_intersect(&r);
-        assert_eq!(xs.len(), 0);
-
-        // a ray intersecting a plane from above
-        let r = Ray::new(pt(0.0, 1.0, 0.0), v(0.0, -1.0, 0.0));
-        let xs = p.local_intersect(&r);
-        assert_eq!(xs.len(), 1);
-        assert_eq!(xs[0].t, 1.0);
-        assert_eq!(xs[0].object, &p as &dyn Shape);
-
-        // a ray intersection a plane from below
-        let r = Ray::new(pt(0.0, -1.0, 0.0), v(0.0, 1.0, 0.0));
-        let xs = p.local_intersect(&r);
-        assert_eq!(xs.len(), 1);
-        assert_eq!(xs[0].t, 1.0);
-        assert_eq!(xs[0].object, &p as &dyn Shape);
     }
 
     #[test]
@@ -879,18 +780,6 @@ mod tests {
     //     let xs = g.intersect(&r);
     //     assert_eq!(xs.len(), 2);
     // }
-
-    #[test]
-    fn plane_normal_at() {
-        // the normal of a plane is constant everywhere
-        let p = plane();
-        let n1 = p.normal_at(pt(0.0, 0.0, 0.0));
-        let n2 = p.normal_at(pt(10.0, 0.0, -10.0));
-        let n3 = p.normal_at(pt(-5.0, 0.0, 150.0));
-        assert_eq!(n1, v(0.0, 1.0, 0.0));
-        assert_eq!(n2, v(0.0, 1.0, 0.0));
-        assert_eq!(n3, v(0.0, 1.0, 0.0));
-    }
 
     #[test]
     fn cube_normal_at() {

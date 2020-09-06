@@ -240,7 +240,7 @@ impl Camera {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{black, planetm, test_pattern, v, Sphere};
+    use crate::{black, test_pattern, v, Plane, Sphere};
     use std::f64::consts::PI;
 
     fn twosqrttwo() -> f64 {
@@ -343,8 +343,12 @@ mod tests {
         ));
         let mut material = Material::new();
         material.reflective = 1.0;
-        let lower = planetm(Matrix4x4::translation(0.0, -1.0, 0.0), material);
-        let upper = planetm(Matrix4x4::translation(0.0, 1.0, 0.0), material);
+        let lower = Plane::new()
+            .transform(Matrix4x4::translation(0.0, -1.0, 0.0))
+            .material(material);
+        let upper = Plane::new()
+            .transform(Matrix4x4::translation(0.0, 1.0, 0.0))
+            .material(material);
         w.objects = vec![lower.into(), upper.into()];
         let r = Ray::new(pt(0.0, 0.0, 0.0), v(0.0, 1.0, 0.0));
         w.color_at(&r, 1);
@@ -497,7 +501,9 @@ mod tests {
         let w = World::default();
         let mut material = Material::new();
         material.reflective = 0.5;
-        let shape = planetm(Matrix4x4::translation(0.0, -1.0, 0.0), material);
+        let shape = Plane::new()
+            .transform(Matrix4x4::translation(0.0, -1.0, 0.0))
+            .material(material);
         let r = Ray::new(pt(0.0, 0.0, -3.0), v(0.0, -twosqrttwo(), twosqrttwo()));
         let i = Intersection::new(twosqrt(), &shape);
         let comps = i.prepare_computations(&r, &vec![i.clone()]);
@@ -514,7 +520,9 @@ mod tests {
         let mut material = Material::new();
         material.transparency = 0.5;
         material.refractive_index = 1.5;
-        let floor = planetm(Matrix4x4::translation(0.0, -1.0, 0.0), material);
+        let floor = Plane::new()
+            .transform(Matrix4x4::translation(0.0, -1.0, 0.0))
+            .material(material);
         let mut material = Material::new();
         material.color = Color::new(1.0, 0.0, 0.0);
         material.ambient = 0.5;
@@ -539,7 +547,9 @@ mod tests {
         material.reflective = 0.5;
         material.transparency = 0.5;
         material.refractive_index = 1.5;
-        let floor = planetm(Matrix4x4::translation(0.0, -1.0, 0.0), material);
+        let floor = Plane::new()
+            .transform(Matrix4x4::translation(0.0, -1.0, 0.0))
+            .material(material);
         let mut material = Material::new();
         material.color = Color::new(1.0, 0.0, 0.0);
         material.ambient = 0.5;
@@ -585,7 +595,9 @@ mod tests {
         let w = World::default();
         let mut material = Material::new();
         material.reflective = 0.5;
-        let shape = planetm(Matrix4x4::translation(0.0, -1.0, 0.0), material);
+        let shape = Plane::new()
+            .transform(Matrix4x4::translation(0.0, -1.0, 0.0))
+            .material(material);
         let r = Ray::new(
             pt(0.0, 0.0, -3.0),
             v(0.0, -2.0_f64.sqrt() / 2.0, 2.0_f64.sqrt() / 2.0),

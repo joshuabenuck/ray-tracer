@@ -22,42 +22,50 @@ fn main() -> Result<(), std::io::Error> {
     floor_material.pattern = Some(floor_pattern);
     floor_material.specular = 0.0;
     floor_material.reflective = 0.4;
-    let floor = planetm(Matrix4x4::rotation_y(0.31415), floor_material);
+    let floor = Plane::new()
+        .transform(Matrix4x4::rotation_y(0.31415))
+        .material(floor_material);
 
     let mut ceiling_material = Material::new();
     ceiling_material.color = Color::new(0.8, 0.8, 0.8);
     ceiling_material.ambient = 0.3;
     ceiling_material.specular = 0.0;
-    let ceiling = planetm(Matrix4x4::translation(0.0, 5.0, 0.0), ceiling_material);
+    let ceiling = Plane::new()
+        .transform(Matrix4x4::translation(0.0, 5.0, 0.0))
+        .material(ceiling_material);
 
-    let west_wall = planetm(
-        // Matrix4x4::rotation_y(1.5708),
-        Matrix4x4::identity()
-            .rotate_y(1.5708)
-            .rotate_z(1.5708)
-            .translate(-5.0, 0.0, 0.0),
-        wall_material,
-    );
-    let east_wall = planetm(
-        // Matrix4x4::rotation_y(1.5708),
-        Matrix4x4::identity()
-            .rotate_y(1.5708)
-            .rotate_z(1.5708)
-            .translate(5.0, 0.0, 0.0),
-        wall_material,
-    );
-    let north_wall = planetm(
-        Matrix4x4::identity()
-            .rotate_x(1.5708)
-            .translate(0.0, 0.0, 5.0),
-        wall_material,
-    );
-    let south_wall = planetm(
-        Matrix4x4::identity()
-            .rotate_x(1.5708)
-            .translate(0.0, 0.0, -5.0),
-        wall_material,
-    );
+    let west_wall = Plane::new()
+        .transform(
+            // Matrix4x4::rotation_y(1.5708),
+            Matrix4x4::identity()
+                .rotate_y(1.5708)
+                .rotate_z(1.5708)
+                .translate(-5.0, 0.0, 0.0),
+        )
+        .material(wall_material);
+    let east_wall = Plane::new()
+        .transform(
+            // Matrix4x4::rotation_y(1.5708),
+            Matrix4x4::identity()
+                .rotate_y(1.5708)
+                .rotate_z(1.5708)
+                .translate(5.0, 0.0, 0.0),
+        )
+        .material(wall_material);
+    let north_wall = Plane::new()
+        .transform(
+            Matrix4x4::identity()
+                .rotate_x(1.5708)
+                .translate(0.0, 0.0, 5.0),
+        )
+        .material(wall_material);
+    let south_wall = Plane::new()
+        .transform(
+            Matrix4x4::identity()
+                .rotate_x(1.5708)
+                .translate(0.0, 0.0, -5.0),
+        )
+        .material(wall_material);
 
     // background
     let sphere1 = Sphere::new()

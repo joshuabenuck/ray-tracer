@@ -18,10 +18,10 @@ pub use pattern::{
 pub use ray::{PointLight, Ray};
 pub use scene::{view_transform, Camera, World};
 pub use shape::{
-    cube, cubem, cubet, cubetm, cylinder, cylinderm, cylindert, cylindertm, plane, planem, planet,
-    planetm, test_shape, Props, Shape,
+    cube, cubem, cubet, cubetm, cylinder, cylinderm, cylindert, cylindertm, test_shape, Props,
+    Shape,
 };
-pub use shapes::Sphere;
+pub use shapes::{Plane, Sphere};
 pub use tuple::{black, pt, v, white, Canvas, Color, Tuple};
 
 pub const EPSILON: f64 = 0.00001;

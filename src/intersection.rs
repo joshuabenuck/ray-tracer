@@ -136,7 +136,7 @@ impl Intersections for Vec<Intersection<'_>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{equal, plane, pt, v, Matrix4x4, Sphere};
+    use crate::{equal, pt, v, Matrix4x4, Plane, Sphere};
 
     #[test]
     fn intersection() {
@@ -219,7 +219,7 @@ mod tests {
         assert_eq!(comps.normalv, v(0.0, 0.0, -1.0));
 
         // precomputing the reflection vector
-        let shape = plane();
+        let shape = Plane::new();
         let r = Ray::new(
             pt(0.0, 1.0, -1.0),
             v(0.0, -2.0_f64.sqrt() / 2.0, 2.0_f64.sqrt() / 2.0),

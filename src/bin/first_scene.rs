@@ -1,6 +1,6 @@
 use ray_tracer::{
-    gradient_pattern, planem, pt, ring_pattern, stripe_pattern, v, view_transform, Camera, Color,
-    Material, Matrix4x4, PointLight, Sphere, World,
+    gradient_pattern, pt, ring_pattern, stripe_pattern, v, view_transform, Camera, Color, Material,
+    Matrix4x4, Plane, PointLight, Sphere, World,
 };
 use std::f64::consts::PI;
 
@@ -13,7 +13,7 @@ fn main() -> Result<(), std::io::Error> {
     ));
     material.pattern = pattern;
     material.specular = 0.0;
-    let floor = planem(material);
+    let floor = Plane::new().material(material);
 
     // let transform = Matrix4x4::translation(0.0, 0.0, 5.0)
     //     * Matrix4x4::rotation_y(-PI / 4.0)
