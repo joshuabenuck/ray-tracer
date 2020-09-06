@@ -32,10 +32,6 @@ impl Debug for Props {
 }
 
 #[derive(PartialEq, Debug)]
-pub struct Cube {
-    props: Props,
-}
-#[derive(PartialEq, Debug)]
 pub struct Cylinder {
     props: Props,
     min: f64,
@@ -157,32 +153,6 @@ pub fn test_shape() -> TestShape {
 }
 
 #[inline]
-pub fn cube() -> Cube {
-    cubetm(Matrix4x4::identity(), Material::new())
-}
-
-#[inline]
-pub fn cubet(transform: Matrix4x4) -> Cube {
-    cubetm(transform, Material::new())
-}
-
-#[inline]
-pub fn cubem(material: Material) -> Cube {
-    cubetm(Matrix4x4::identity(), material)
-}
-
-#[inline]
-pub fn cubetm(transform: Matrix4x4, material: Material) -> Cube {
-    Cube {
-        props: Props {
-            transform,
-            material,
-            ..Props::default()
-        },
-    }
-}
-
-#[inline]
 pub fn cylinder(min: f64, max: f64, closed: bool) -> Cylinder {
     cylindertm(Matrix4x4::identity(), Material::new(), min, max, closed)
 }
@@ -244,26 +214,6 @@ pub fn triangle(p1: Tuple, p2: Tuple, p3: Tuple) -> Triangle {
     }
 }
 
-fn check_axis(origin: f64, direction: f64) -> (f64, f64) {
-    let tmin_numerator = -1.0 - origin;
-    let tmax_numerator = 1.0 - origin;
-
-    let (mut tmin, mut tmax) = if direction.abs() >= EPSILON {
-        (tmin_numerator / direction, tmax_numerator / direction)
-    } else {
-        (
-            tmin_numerator * std::f64::INFINITY,
-            tmax_numerator * std::f64::INFINITY,
-        )
-    };
-
-    if tmin > tmax {
-        std::mem::swap(&mut tmin, &mut tmax);
-    }
-
-    (tmin, tmax)
-}
-
 // a helper function to reduce duplication
 // checks to see if the intersection at t is within a radius
 // of 1 (the radius of the cylinders) from the x axis
@@ -306,59 +256,6 @@ impl Shape for TestShape {
 
     fn local_normal_at(&self, local_point: Tuple) -> Tuple {
         v(local_point.x, local_point.y, local_point.z)
-    }
-
-    fn common(&self) -> &Props {
-        &self.props
-    }
-
-    fn common_mut(&mut self) -> &mut Props {
-        &mut self.props
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn shape_eq(&self, other: &dyn Any) -> bool {
-        match other.downcast_ref::<Self>() {
-            Some(_) => true,
-            None => false,
-        }
-    }
-}
-
-impl Shape for Cube {
-    fn local_intersect(&'_ self, ray: &Ray) -> Vec<Intersection<'_>> {
-        // How to avoid always doing all of these computations?
-        let (xtmin, xtmax) = check_axis(ray.origin.x, ray.direction.x);
-        let (ytmin, ytmax) = check_axis(ray.origin.y, ray.direction.y);
-        let (ztmin, ztmax) = check_axis(ray.origin.z, ray.direction.z);
-
-        let tmin = xtmin.max(ytmin).max(ztmin);
-        let tmax = xtmax.min(ytmax).min(ztmax);
-
-        if tmin > tmax {
-            return Vec::new();
-        }
-
-        vec![Intersection::new(tmin, self), Intersection::new(tmax, self)]
-    }
-
-    fn local_normal_at(&self, local_point: Tuple) -> Tuple {
-        let maxc = local_point
-            .x
-            .abs()
-            .max(local_point.y.abs())
-            .max(local_point.z.abs());
-
-        if maxc == local_point.x.abs() {
-            v(local_point.x, 0.0, 0.0)
-        } else if maxc == local_point.y.abs() {
-            v(0.0, local_point.y, 0.0)
-        } else {
-            v(0.0, 0.0, local_point.z)
-        }
     }
 
     fn common(&self) -> &Props {
@@ -514,12 +411,6 @@ impl<'a> From<Triangle> for Box<dyn Shape + 'a> {
     }
 }
 
-impl<'a> From<Cube> for Box<dyn Shape + 'a> {
-    fn from(value: Cube) -> Box<dyn Shape + 'a> {
-        Box::new(value)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -621,46 +512,6 @@ mod tests {
         s.set_transform(Matrix4x4::scaling(1.0, 0.5, 1.0) * Matrix4x4::rotation_z(PI / 5.0));
         let n = s.normal_at(pt(0.0, 2.0_f64 / 2.0, -2.0_f64 / 2.0));
         assert_eq!(n, v(0.0, 0.97014, -0.24254));
-    }
-
-    #[test]
-    fn ray_intersection_with_cube() {
-        // a ray intersects a cube
-        fn test(origin: Tuple, direction: Tuple, t1: f64, t2: f64) {
-            let c = cube();
-            let r = Ray::new(origin, direction);
-            let xs = c.local_intersect(&r);
-            assert_eq!(xs.len(), 2);
-            assert_eq!(xs[0].t, t1);
-            assert_eq!(xs[1].t, t2);
-        }
-        // +x
-        test(pt(5.0, 0.5, 0.0), v(-1.0, 0.0, 0.0), 4.0, 6.0);
-        // -x
-        test(pt(-5.0, 0.5, 0.0), v(1.0, 0.0, 0.0), 4.0, 6.0);
-        // +y
-        test(pt(0.5, 5.0, 0.0), v(0.0, -1.0, 0.0), 4.0, 6.0);
-        // -y
-        test(pt(0.5, -5.0, 0.0), v(0.0, 1.0, 0.0), 4.0, 6.0);
-        // +z
-        test(pt(0.5, 0.0, 5.0), v(0.0, 0.0, -1.0), 4.0, 6.0);
-        // -z
-        test(pt(0.5, 0.0, -5.0), v(0.0, 0.0, 1.0), 4.0, 6.0);
-        // insidee
-        test(pt(0.0, 0.5, 0.0), v(0.0, 0.0, 1.0), -1.0, 1.0);
-
-        fn test_miss(origin: Tuple, direction: Tuple) {
-            let c = cube();
-            let r = Ray::new(origin, direction);
-            let xs = c.local_intersect(&r);
-            assert_eq!(xs.len(), 0);
-        }
-        test_miss(pt(-2.0, 0.0, 0.0), v(0.2673, 0.5345, 0.8018));
-        test_miss(pt(0.0, -2.0, 0.0), v(0.8018, 0.2673, 0.5345));
-        test_miss(pt(0.0, 0.0, -2.0), v(0.5345, 0.8018, 0.2673));
-        test_miss(pt(2.0, 0.0, 2.0), v(0.0, 0.0, -1.0));
-        test_miss(pt(0.0, 2.0, 2.0), v(0.0, -1.0, 0.0));
-        test_miss(pt(2.0, 0.0, 2.0), v(-1.0, 0.0, 0.0));
     }
 
     #[test]
@@ -780,26 +631,6 @@ mod tests {
     //     let xs = g.intersect(&r);
     //     assert_eq!(xs.len(), 2);
     // }
-
-    #[test]
-    fn cube_normal_at() {
-        // the normal of the surface of a cube
-        fn test(point: Tuple, normal: Tuple) {
-            let c = cube();
-            let n = c.normal_at(point);
-            assert_eq!(n, normal);
-        }
-
-        test(pt(1.0, 0.5, -0.8), v(1.0, 0.0, 0.0));
-        test(pt(-1.0, -0.2, 0.9), v(-1.0, 0.0, 0.0));
-        test(pt(-0.4, 1.0, -0.1), v(0.0, 1.0, 0.0));
-        test(pt(0.3, -1.0, -0.7), v(0.0, -1.0, 0.0));
-        test(pt(0.6, 0.3, 1.0), v(0.0, 0.0, 1.0));
-        test(pt(0.4, 0.4, -1.0), v(0.0, 0.0, -1.0));
-        // normal at cube's corners
-        test(pt(1.0, 1.0, 1.0), v(1.0, 0.0, 0.0));
-        test(pt(-1.0, -1.0, -1.0), v(-1.0, 0.0, 0.0));
-    }
 
     #[test]
     fn cylinder_normal_at() {
