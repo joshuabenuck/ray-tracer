@@ -1,4 +1,4 @@
-use crate::{normal_at, Ray, Shape, Tuple, EPSILON};
+use crate::{Ray, Shape, Tuple, EPSILON};
 
 pub fn schlick(comps: &Comps) -> f64 {
     // find the cosine of the angle between the eye and the normal vectors
@@ -62,7 +62,7 @@ impl<'a> Intersection<'a> {
         // precompute some useful values
         let point = ray.position(t);
         let eyev = -ray.direction;
-        let normalv = normal_at(object, point);
+        let normalv = object.normal_at(point);
         let inside = normalv.dot(&eyev) < 0.0;
         let normalv = if inside { -normalv } else { normalv };
         let reflectv = ray.direction.reflect(&normalv);
@@ -136,18 +136,18 @@ impl Intersections for Vec<Intersection<'_>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{equal, glass_sphere, glass_spheret, plane, pt, sphere, v, Matrix4x4};
+    use crate::{equal, plane, pt, v, Matrix4x4, Sphere};
 
     #[test]
     fn intersection() {
         // an intersection encapsulates t and object
-        let s = sphere();
+        let s = Sphere::new();
         let i = Intersection::new(3.5, &s);
         assert_eq!(3.5, i.t);
         assert_eq!(i.object, &s as &dyn Shape);
 
         // aggregate intersections
-        let s = sphere();
+        let s = Sphere::new();
         let i1 = Intersection::new(1.0, &s);
         let i2 = Intersection::new(2.0, &s);
         let mut xs = [i1, i2];
@@ -157,7 +157,7 @@ mod tests {
         assert_eq!(xs[1].t, 2.0);
 
         // the hit when all intersections have positive t
-        let s = sphere();
+        let s = Sphere::new();
         let i1 = Intersection::new(1.0, &s);
         let i2 = Intersection::new(2.0, &s);
         let mut xs = vec![i2.clone(), i1.clone()];
@@ -196,7 +196,7 @@ mod tests {
     fn intersection_precomputation() {
         // precomputing the state of an interesection
         let r = Ray::new(pt(0.0, 0.0, -5.0), v(0.0, 0.0, 1.0));
-        let shape = sphere();
+        let shape = Sphere::new();
         let i = Intersection::new(4.0, &shape);
         let comps = i.prepare_computations(&r, &vec![i.clone()]);
         assert_eq!(comps.t, i.t);
@@ -234,10 +234,10 @@ mod tests {
 
     #[test]
     fn intersections_n1_n2() {
-        let a = glass_spheret(Matrix4x4::scaling(2.0, 2.0, 2.0));
-        let mut b = glass_spheret(Matrix4x4::translation(0.0, 0.0, -0.25));
+        let a = Sphere::glass().transform(Matrix4x4::scaling(2.0, 2.0, 2.0));
+        let mut b = Sphere::glass().transform(Matrix4x4::translation(0.0, 0.0, -0.25));
         b.material_mut().refractive_index = 2.0;
-        let mut c = glass_spheret(Matrix4x4::translation(0.0, 0.0, 0.25));
+        let mut c = Sphere::glass().transform(Matrix4x4::translation(0.0, 0.0, 0.25));
         c.material_mut().refractive_index = 2.5;
         let r = Ray::new(pt(0.0, 0.0, -4.0), v(0.0, 0.0, 1.0));
         let xs = vec![
@@ -278,7 +278,7 @@ mod tests {
     fn comps_under_point() {
         // the under point is offset below the surface
         let r = Ray::new(pt(0.0, 0.0, -5.0), v(0.0, 0.0, 1.0));
-        let shape = glass_spheret(Matrix4x4::translation(0.0, 0.0, 1.0));
+        let shape = Sphere::glass().transform(Matrix4x4::translation(0.0, 0.0, 1.0));
         let i = Intersection::new(5.0, &shape);
         let xs = vec![i.clone()];
         let comps = i.prepare_computations(&r, &xs);
@@ -289,7 +289,7 @@ mod tests {
     #[test]
     fn comps_schlick() {
         // the schlick approximation under total internal reflection
-        let shape = glass_sphere();
+        let shape = Sphere::glass();
         let r = Ray::new(pt(0.0, 0.0, 2.0_f64.sqrt() / 2.0), v(0.0, 1.0, 0.0));
         let xs = vec![
             Intersection::new(-2.0_f64.sqrt() / 2.0, &shape),
@@ -304,7 +304,7 @@ mod tests {
         assert_eq!(reflectance, 1.0);
 
         // the schlick approximation with a perpendicular viewing angle
-        let shape = glass_sphere();
+        let shape = Sphere::glass();
         let r = Ray::new(pt(0.0, 0.0, 0.0), v(0.0, 1.0, 0.0));
         let xs = vec![
             Intersection::new(-1.0, &shape),
@@ -316,7 +316,7 @@ mod tests {
         assert_eq!(equal(reflectance, 0.04), true);
 
         // the schlick approximation with small angle and n2 > n1
-        let shape = glass_sphere();
+        let shape = Sphere::glass();
         let r = Ray::new(pt(0.0, 0.99, -2.0), v(0.0, 0.0, 1.0));
         let xs = vec![Intersection::new(1.8589, &shape)];
         let i = xs[0].clone();

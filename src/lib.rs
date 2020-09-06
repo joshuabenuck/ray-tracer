@@ -5,6 +5,7 @@ mod pattern;
 mod ray;
 mod scene;
 mod shape;
+mod shapes;
 mod tuple;
 
 pub use intersection::{schlick, Comps, Intersection, Intersections};
@@ -17,10 +18,10 @@ pub use pattern::{
 pub use ray::{PointLight, Ray};
 pub use scene::{view_transform, Camera, World};
 pub use shape::{
-    cube, cubem, cubet, cubetm, cylinder, cylinderm, cylindert, cylindertm, glass_sphere,
-    glass_spheret, normal_at, plane, planem, planet, planetm, sphere, spherem, spheret, spheretm,
-    test_shape, world_to_object, Cube, Cylinder, Shape, Sphere, Triangle,
+    cube, cubem, cubet, cubetm, cylinder, cylinderm, cylindert, cylindertm, plane, planem, planet,
+    planetm, test_shape, Props, Shape,
 };
+pub use shapes::Sphere;
 pub use tuple::{black, pt, v, white, Canvas, Color, Tuple};
 
 pub const EPSILON: f64 = 0.00001;

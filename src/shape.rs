@@ -31,10 +31,6 @@ impl Debug for Props {
     }
 }
 
-#[derive(PartialEq, Debug, Clone)]
-pub struct Sphere {
-    props: Props,
-}
 #[derive(PartialEq, Debug)]
 pub struct Plane {
     props: Props,
@@ -72,6 +68,31 @@ pub trait Shape {
         self.local_intersect(&ray)
     }
     fn local_intersect(&'_ self, ray: &Ray) -> Vec<Intersection<'_>>;
+    fn normal_at(&self, world_point: Tuple) -> Tuple {
+        let object_point = self.world_to_object(world_point);
+        let object_normal = self.local_normal_at(object_point);
+        self.normal_to_world(object_normal)
+    }
+    fn world_to_object(&self, point: Tuple) -> Tuple {
+        let point = point;
+        let shape = self;
+        // if let Some(parent) = &shape.parent {
+        //     point = world_to_object(&parent, point);
+        // }
+        shape.transform().inverse().unwrap() * point
+    }
+    fn normal_to_world(&self, normal: Tuple) -> Tuple {
+        let shape = self;
+        let mut normal = shape.transform().inverse().unwrap().transpose() * normal;
+        normal.w = 0.0;
+        normal = normal.normalize();
+
+        // if let Some(parent) = &shape.parent {
+        //     normal = normal_to_world(&parent, normal);
+        // }
+
+        normal
+    }
     fn local_normal_at(&self, local_point: Tuple) -> Tuple;
     fn common(&self) -> &Props;
     fn common_mut(&mut self) -> &mut Props;
@@ -165,47 +186,6 @@ pub fn planetm(transform: Matrix4x4, material: Material) -> Plane {
             ..Props::default()
         },
     }
-}
-
-#[inline]
-pub fn sphere() -> Sphere {
-    spheretm(Matrix4x4::identity(), Material::new())
-}
-
-pub fn spheretm(transform: Matrix4x4, material: Material) -> Sphere {
-    Sphere {
-        props: Props {
-            transform,
-            material,
-            ..Props::default()
-        },
-    }
-}
-
-#[inline]
-pub fn spheret(transform: Matrix4x4) -> Sphere {
-    spheretm(transform, Material::new())
-}
-
-#[inline]
-pub fn spherem(material: Material) -> Sphere {
-    spheretm(Matrix4x4::identity(), material)
-}
-
-#[inline]
-pub fn glass_sphere() -> Sphere {
-    let mut m = Material::new();
-    m.transparency = 1.0;
-    m.refractive_index = 1.5;
-    spherem(m)
-}
-
-#[inline]
-pub fn glass_spheret(transform: Matrix4x4) -> Sphere {
-    let mut m = Material::new();
-    m.transparency = 1.0;
-    m.refractive_index = 1.5;
-    spheretm(transform, m)
 }
 
 #[inline]
@@ -358,49 +338,6 @@ impl Shape for TestShape {
 
     fn local_normal_at(&self, local_point: Tuple) -> Tuple {
         v(local_point.x, local_point.y, local_point.z)
-    }
-
-    fn common(&self) -> &Props {
-        &self.props
-    }
-
-    fn common_mut(&mut self) -> &mut Props {
-        &mut self.props
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn shape_eq(&self, other: &dyn Any) -> bool {
-        match other.downcast_ref::<Self>() {
-            Some(_) => true,
-            None => false,
-        }
-    }
-}
-
-impl Shape for Sphere {
-    fn local_intersect(&'_ self, ray: &Ray) -> Vec<Intersection<'_>> {
-        let sphere_to_ray = ray.origin - pt(0.0, 0.0, 0.0);
-
-        let a = ray.direction.dot(&ray.direction);
-        let b = 2.0 * ray.direction.dot(&sphere_to_ray);
-        let c = sphere_to_ray.dot(&sphere_to_ray) - 1.0;
-
-        let discriminant = (b * b) - 4.0 * a * c;
-
-        if discriminant < 0.0 {
-            return Vec::new();
-        }
-
-        let t1 = (-b - discriminant.sqrt()) / (2.0 * a);
-        let t2 = (-b + discriminant.sqrt()) / (2.0 * a);
-        vec![Intersection::new(t1, self), Intersection::new(t2, self)]
-    }
-
-    fn local_normal_at(&self, local_point: Tuple) -> Tuple {
-        local_point - pt(0.0, 0.0, 0.0)
     }
 
     fn common(&self) -> &Props {
@@ -643,12 +580,6 @@ impl<'a> From<Triangle> for Box<dyn Shape + 'a> {
     }
 }
 
-impl<'a> From<Sphere> for Box<dyn Shape + 'a> {
-    fn from(value: Sphere) -> Box<dyn Shape + 'a> {
-        Box::new(value)
-    }
-}
-
 impl<'a> From<Cube> for Box<dyn Shape + 'a> {
     fn from(value: Cube) -> Box<dyn Shape + 'a> {
         Box::new(value)
@@ -659,34 +590,6 @@ impl<'a> From<Plane> for Box<dyn Shape + 'a> {
     fn from(value: Plane) -> Box<dyn Shape + 'a> {
         Box::new(value)
     }
-}
-
-pub fn normal_at(shape: &dyn Shape, world_point: Tuple) -> Tuple {
-    let object_point = world_to_object(shape, world_point);
-    let object_normal = shape.local_normal_at(object_point);
-    normal_to_world(shape, object_normal)
-}
-
-pub fn world_to_object(shape: &dyn Shape, point: Tuple) -> Tuple {
-    let point = point;
-    let shape = shape;
-    // if let Some(parent) = &shape.parent {
-    //     point = world_to_object(&parent, point);
-    // }
-    shape.transform().inverse().unwrap() * point
-}
-
-pub fn normal_to_world(shape: &dyn Shape, normal: Tuple) -> Tuple {
-    let shape = shape;
-    let mut normal = shape.transform().inverse().unwrap().transpose() * normal;
-    normal.w = 0.0;
-    normal = normal.normalize();
-
-    // if let Some(parent) = &shape.parent {
-    //     normal = normal_to_world(&parent, normal);
-    // }
-
-    normal
 }
 
 #[cfg(test)]
@@ -735,15 +638,6 @@ mod tests {
         };
     }
 
-    #[test]
-    fn sphere_glass() {
-        // a helper for producing a sphere with a glassy material
-        let s = glass_sphere();
-        assert_eq!(s.transform(), &Matrix4x4::identity());
-        assert_eq!(s.material().transparency, 1.0);
-        assert_eq!(s.material().refractive_index, 1.5);
-    }
-
     // #[test]
     // fn group_create() {
     //     // creating a new group
@@ -790,53 +684,14 @@ mod tests {
         // computing the normal on a translated shape
         let mut s = test_shape();
         s.set_transform(Matrix4x4::translation(0.0, 1.0, 0.0));
-        let n = normal_at(&s, pt(0.0, 1.70711, -0.70711));
+        let n = s.normal_at(pt(0.0, 1.70711, -0.70711));
         assert_eq!(n, v(0.0, 0.70711, -0.70711));
 
         // computing the normal on a transformed shape
         let mut s = test_shape();
         s.set_transform(Matrix4x4::scaling(1.0, 0.5, 1.0) * Matrix4x4::rotation_z(PI / 5.0));
-        let n = normal_at(&s, pt(0.0, 2.0_f64 / 2.0, -2.0_f64 / 2.0));
+        let n = s.normal_at(pt(0.0, 2.0_f64 / 2.0, -2.0_f64 / 2.0));
         assert_eq!(n, v(0.0, 0.97014, -0.24254));
-    }
-
-    #[test]
-    fn ray_sphere_intersection() {
-        // a ray intersects a sphere at two points
-        let r = Ray::new(pt(0.0, 0.0, -5.0), v(0.0, 0.0, 1.0));
-        let s = sphere();
-        let xs = s.intersect(&r);
-        assert_eq!(xs.len(), 2);
-        assert_eq!(xs[0].t, 4.0);
-        assert_eq!(xs[0].object, &sphere() as &dyn Shape);
-        assert_eq!(xs[1].t, 6.0);
-        assert_eq!(xs[1].object, &sphere() as &dyn Shape);
-
-        // a ray intersects a sphere at a tangent
-        let r = Ray::new(pt(0.0, 1.0, -5.0), v(0.0, 0.0, 1.0));
-        let xs = s.intersect(&r);
-        assert_eq!(xs.len(), 2);
-        assert_eq!(xs[0].t, 5.0);
-        assert_eq!(xs[1].t, 5.0);
-
-        // a ray misses a sphere
-        let r = Ray::new(pt(0.0, 2.0, -5.0), v(0.0, 0.0, 1.0));
-        let xs = s.intersect(&r);
-        assert_eq!(xs.len(), 0);
-
-        // a ray originates inside a sphere
-        let r = Ray::new(pt(0.0, 0.0, 0.0), v(0.0, 0.0, 1.0));
-        let xs = s.intersect(&r);
-        assert_eq!(xs.len(), 2);
-        assert_eq!(xs[0].t, -1.0);
-        assert_eq!(xs[1].t, 1.0);
-
-        // a sphere is behind a ray
-        let r = Ray::new(pt(0.0, 0.0, 5.0), v(0.0, 0.0, 1.0));
-        let xs = s.intersect(&r);
-        assert_eq!(xs.len(), 2);
-        assert_eq!(xs[0].t, -6.0);
-        assert_eq!(xs[1].t, -4.0);
     }
 
     #[test]
@@ -865,22 +720,6 @@ mod tests {
         assert_eq!(xs.len(), 1);
         assert_eq!(xs[0].t, 1.0);
         assert_eq!(xs[0].object, &p as &dyn Shape);
-    }
-
-    #[test]
-    fn ray_intersection_with_scaled_sphere() {
-        // intersecting a scaled sphere with a ray
-        let r = Ray::new(pt(0.0, 0.0, -5.0), v(0.0, 0.0, 1.0));
-        let s = spheret(Matrix4x4::scaling(2.0, 2.0, 2.0));
-        let xs = s.intersect(&r);
-        assert_eq!(xs.len(), 2);
-        assert_eq!(xs[0].t, 3.0);
-        assert_eq!(xs[1].t, 7.0);
-
-        // intersecting a translated sphere with a ray
-        let s = spheret(Matrix4x4::translation(5.0, 0.0, 0.0));
-        let xs = s.intersect(&r);
-        assert_eq!(xs.len(), 0);
     }
 
     #[test]
@@ -1013,9 +852,9 @@ mod tests {
     fn ray_intersection_with_non_empty_group() {
         // intersecting a ray with a non-empty group
         // let g = group();
-        // let s1: Box<dyn Shape> = sphere().into();
-        // let s2: Box<dyn Shape> = spheret(Matrix4x4::translation(0.0, 0.0, -3.0)).into();
-        // let s3: Box<dyn Shape> = spheret(Matrix4x4::translation(5.0, 0.0, 0.0)).into();
+        // let s1: Box<dyn Shape> = Sphere::new().into();
+        // let s2: Box<dyn Shape> = Sphere::new().transform(Matrix4x4::translation(0.0, 0.0, -3.0)).into();
+        // let s3: Box<dyn Shape> = Sphere::new().transform(Matrix4x4::translation(5.0, 0.0, 0.0)).into();
         // add_child(&mut g, s1.clone());
         // add_child(&mut g, s2.clone());
         // add_child(&mut g, s3.clone());
@@ -1034,7 +873,7 @@ mod tests {
     //     // intersecting a transformed group
     //     let mut g = group();
     //     g.set_transform(Matrix4x4::scaling(2.0, 2.0, 2.0));
-    //     // let s = spheret(Matrix4x4::translation(5.0, 0.0, 0.0));
+    //     // let s = Sphere::new().transform(Matrix4x4::translation(5.0, 0.0, 0.0));
     //     // add_child(&g, s.clone());
     //     let r = Ray::new(pt(10.0, 0.0, -10.0), v(0.0, 0.0, 1.0));
     //     let xs = g.intersect(&r);
@@ -1042,49 +881,12 @@ mod tests {
     // }
 
     #[test]
-    fn sphere_normal_at() {
-        // the normal on a sphere at a point on the x axis
-        let s = sphere();
-        let n = normal_at(&s, pt(1.0, 0.0, 0.0));
-        assert_eq!(n, v(1.0, 0.0, 0.0));
-
-        // the normal on a sphere at a point on the y axis
-        let n = normal_at(&s, pt(0.0, 1.0, 0.0));
-        assert_eq!(n, v(0.0, 1.0, 0.0));
-
-        // the normal on a sphere at a point on the y axis
-        let n = normal_at(&s, pt(0.0, 0.0, 1.0));
-        assert_eq!(n, v(0.0, 0.0, 1.0));
-
-        // the normal on a sphere at a point on a nonaxial point
-        let n = normal_at(
-            &s,
-            pt(
-                3.0_f64.sqrt() / 3.0,
-                3.0_f64.sqrt() / 3.0,
-                3.0_f64.sqrt() / 3.0,
-            ),
-        );
-        assert_eq!(
-            n,
-            v(
-                3.0_f64.sqrt() / 3.0,
-                3.0_f64.sqrt() / 3.0,
-                3.0_f64.sqrt() / 3.0
-            )
-        );
-
-        // the normal is a normalized vector
-        assert_eq!(n, n.normalize());
-    }
-
-    #[test]
     fn plane_normal_at() {
         // the normal of a plane is constant everywhere
         let p = plane();
-        let n1 = normal_at(&p, pt(0.0, 0.0, 0.0));
-        let n2 = normal_at(&p, pt(10.0, 0.0, -10.0));
-        let n3 = normal_at(&p, pt(-5.0, 0.0, 150.0));
+        let n1 = p.normal_at(pt(0.0, 0.0, 0.0));
+        let n2 = p.normal_at(pt(10.0, 0.0, -10.0));
+        let n3 = p.normal_at(pt(-5.0, 0.0, 150.0));
         assert_eq!(n1, v(0.0, 1.0, 0.0));
         assert_eq!(n2, v(0.0, 1.0, 0.0));
         assert_eq!(n3, v(0.0, 1.0, 0.0));
@@ -1095,7 +897,7 @@ mod tests {
         // the normal of the surface of a cube
         fn test(point: Tuple, normal: Tuple) {
             let c = cube();
-            let n = normal_at(&c, point);
+            let n = c.normal_at(point);
             assert_eq!(n, normal);
         }
 
@@ -1148,7 +950,7 @@ mod tests {
     //     g1.set_transform(Matrix4x4::rotation_y(PI / 2.0));
     //     let mut g2 = group();
     //     g2.set_transform(Matrix4x4::scaling(2.0, 2.0, 2.0));
-    //     let s = spheret(Matrix4x4::translation(5.0, 0.0, 0.0));
+    //     let s = Sphere::new().transform(Matrix4x4::translation(5.0, 0.0, 0.0));
     //     // add_child(&g2, s.clone());
     //     // add_child(&g1, g2);
     //     let p = world_to_object(&s, pt(-2.0, 0.0, -10.0));
@@ -1162,7 +964,7 @@ mod tests {
     //     g1.set_transform(Matrix4x4::rotation_y(PI / 2.0));
     //     let mut g2 = group();
     //     g2.set_transform(Matrix4x4::scaling(1.0, 2.0, 3.0));
-    //     let s = spheret(Matrix4x4::translation(5.0, 0.0, 0.0));
+    //     let s = Sphere::new().transform(Matrix4x4::translation(5.0, 0.0, 0.0));
     //     // add_child(&g2, s.clone());
     //     // add_child(&g1, g2);
     //     let n = normal_to_world(
@@ -1183,7 +985,7 @@ mod tests {
     //     g1.set_transform(Matrix4x4::rotation_y(PI / 2.0));
     //     let mut g2 = group();
     //     g2.set_transform(Matrix4x4::scaling(1.0, 2.0, 3.0));
-    //     let s = spheret(Matrix4x4::translation(5.0, 0.0, 0.0));
+    //     let s = Sphere::new().transform(Matrix4x4::translation(5.0, 0.0, 0.0));
     //     // add_child(&g2, s.clone());
     //     // add_child(&g1, g2);
     //     let n = normal_at(&s, pt(1.7321, 1.1547, -5.5774));

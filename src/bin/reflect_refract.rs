@@ -60,50 +60,47 @@ fn main() -> Result<(), std::io::Error> {
     );
 
     // background
-    let sphere1 = spheretm(
-        id().scale(0.4, 0.4, 0.4).translate(4.6, 0.4, 1.0),
-        m().rgb(0.8, 0.5, 0.3).shininess(50.0),
-    );
-    let sphere2 = spheretm(
-        id().scale(0.3, 0.3, 0.3).translate(4.7, 0.3, 0.4),
-        m().rgb(0.9, 0.4, 0.5).shininess(50.0),
-    );
-    let sphere3 = spheretm(
-        id().scale(0.5, 0.5, 0.5).translate(-1.0, 0.5, 4.5),
-        m().rgb(0.4, 0.9, 0.6).shininess(50.0),
-    );
-    let sphere4 = spheretm(
-        id().scale(0.3, 0.3, 0.3).translate(-1.7, 0.3, 4.7),
-        m().rgb(0.4, 0.6, 0.9).shininess(50.0),
-    );
+    let sphere1 = Sphere::new()
+        .transform(id().scale(0.4, 0.4, 0.4).translate(4.6, 0.4, 1.0))
+        .material(m().rgb(0.8, 0.5, 0.3).shininess(50.0));
+    let sphere2 = Sphere::new()
+        .transform(id().scale(0.3, 0.3, 0.3).translate(4.7, 0.3, 0.4))
+        .material(m().rgb(0.9, 0.4, 0.5).shininess(50.0));
+    let sphere3 = Sphere::new()
+        .transform(id().scale(0.5, 0.5, 0.5).translate(-1.0, 0.5, 4.5))
+        .material(m().rgb(0.4, 0.9, 0.6).shininess(50.0));
+    let sphere4 = Sphere::new()
+        .transform(id().scale(0.3, 0.3, 0.3).translate(-1.7, 0.3, 4.7))
+        .material(m().rgb(0.4, 0.6, 0.9).shininess(50.0));
 
     // foreground
-    let red = spheretm(
-        id().translate(-0.6, 1.0, 0.6),
-        m().rgb(1.0, 0.3, 0.2).specular(0.4).shininess(5.0),
-    );
-    let blue = spheretm(
-        id().scale(0.7, 0.7, 0.7).translate(0.6, 0.7, -0.6),
-        m().rgb(0.0, 0.0, 0.2)
-            .ambient(0.0)
-            .diffuse(0.4)
-            .specular(0.9)
-            .shininess(300.0)
-            .reflective(0.9)
-            .transparency(0.9)
-            .refractive_index(1.5),
-    );
-    let green = spheretm(
-        id().scale(0.5, 0.5, 0.5).translate(-0.7, 0.5, -0.8),
-        m().rgb(0.0, 0.2, 0.0)
-            .ambient(0.0)
-            .diffuse(0.4)
-            .specular(0.9)
-            .shininess(300.0)
-            .reflective(0.9)
-            .transparency(0.9)
-            .refractive_index(1.5),
-    );
+    let red = Sphere::new()
+        .transform(id().translate(-0.6, 1.0, 0.6))
+        .material(m().rgb(1.0, 0.3, 0.2).specular(0.4).shininess(5.0));
+    let blue = Sphere::new()
+        .transform(id().scale(0.7, 0.7, 0.7).translate(0.6, 0.7, -0.6))
+        .material(
+            m().rgb(0.0, 0.0, 0.2)
+                .ambient(0.0)
+                .diffuse(0.4)
+                .specular(0.9)
+                .shininess(300.0)
+                .reflective(0.9)
+                .transparency(0.9)
+                .refractive_index(1.5),
+        );
+    let green = Sphere::new()
+        .transform(id().scale(0.5, 0.5, 0.5).translate(-0.7, 0.5, -0.8))
+        .material(
+            m().rgb(0.0, 0.2, 0.0)
+                .ambient(0.0)
+                .diffuse(0.4)
+                .specular(0.9)
+                .shininess(300.0)
+                .reflective(0.9)
+                .transparency(0.9)
+                .refractive_index(1.5),
+        );
 
     let mut world = World::empty();
     world.lights.push(light);

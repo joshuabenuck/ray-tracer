@@ -1,6 +1,6 @@
 use ray_tracer::{
-    lighting, normal_at, spheretm, Canvas, Color, Intersections, Material, Matrix4x4, PointLight,
-    Ray, Shape, Tuple,
+    lighting, Canvas, Color, Intersections, Material, Matrix4x4, PointLight, Ray, Shape, Sphere,
+    Tuple,
 };
 
 fn main() -> Result<(), std::io::Error> {
@@ -25,7 +25,7 @@ fn main() -> Result<(), std::io::Error> {
 
     let mut material = Material::new();
     material.color = Color::new(1.0, 0.2, 1.0);
-    let shape = spheretm(transform, material);
+    let shape = Sphere::new().transform(transform).material(material);
     let light_position = Tuple::point(-10.0, 10.0, -10.0);
     let light_color = Color::new(1.0, 1.0, 1.0);
     let light = PointLight::new(light_position, light_color);
@@ -47,7 +47,7 @@ fn main() -> Result<(), std::io::Error> {
 
             if let Some(hit) = xs.hit() {
                 let point = r.position(hit.t);
-                let normal = normal_at(hit.object, point);
+                let normal = hit.object.normal_at(point);
                 let eye = -r.direction;
                 let color = lighting(
                     &hit.object.material(),

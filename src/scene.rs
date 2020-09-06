@@ -1,6 +1,6 @@
 use crate::{
-    lighting, pt, schlick, spherem, spheret, Canvas, Color, Comps, Intersection, Intersections,
-    Material, Matrix4x4, PointLight, Ray, Shape, Tuple,
+    lighting, pt, schlick, Canvas, Color, Comps, Intersection, Intersections, Material, Matrix4x4,
+    PointLight, Ray, Shape, Sphere, Tuple,
 };
 
 pub struct World {
@@ -138,9 +138,9 @@ impl Default for World {
         material.diffuse = 0.7;
         material.specular = 0.2;
         // outer
-        let s1 = spherem(material);
+        let s1 = Sphere::new().material(material);
         // inner
-        let s2 = spheret(Matrix4x4::scaling(0.5, 0.5, 0.5));
+        let s2 = Sphere::new().transform(Matrix4x4::scaling(0.5, 0.5, 0.5));
         World {
             objects: vec![s1.into(), s2.into()],
             lights: vec![light],
@@ -240,7 +240,7 @@ impl Camera {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{black, planetm, sphere, spheretm, test_pattern, v};
+    use crate::{black, planetm, test_pattern, v, Sphere};
     use std::f64::consts::PI;
 
     fn twosqrttwo() -> f64 {
@@ -264,8 +264,8 @@ mod tests {
         material.color = Color::new(0.8, 1.0, 0.6);
         material.diffuse = 0.7;
         material.specular = 0.2;
-        let s1 = spherem(material);
-        let s2 = spheret(Matrix4x4::scaling(0.5, 0.5, 0.5));
+        let s1 = Sphere::new().material(material);
+        let s2 = Sphere::new().transform(Matrix4x4::scaling(0.5, 0.5, 0.5));
         let w = World::default();
         assert_eq!(w.lights[0], light);
         assert_eq!(w.objects.contains(&s1.into()), true);
@@ -480,9 +480,9 @@ mod tests {
             pt(0.0, 0.0, -10.0),
             Color::new(1.0, 1.0, 1.0),
         ));
-        let s1 = sphere();
+        let s1 = Sphere::new();
         let transform = Matrix4x4::translation(0.0, 0.0, 10.0);
-        let s2 = spheret(transform);
+        let s2 = Sphere::new().transform(transform);
         w.objects.append(&mut vec![s1.into(), s2.clone().into()]);
         let r = Ray::new(pt(0.0, 0.0, 5.0), v(0.0, 0.0, 1.0));
         let i = Intersection::new(4.0, &s2);
@@ -518,7 +518,9 @@ mod tests {
         let mut material = Material::new();
         material.color = Color::new(1.0, 0.0, 0.0);
         material.ambient = 0.5;
-        let ball = spheretm(Matrix4x4::translation(0.0, -3.5, -0.5), material);
+        let ball = Sphere::new()
+            .transform(Matrix4x4::translation(0.0, -3.5, -0.5))
+            .material(material);
         w.objects.append(&mut vec![floor.into(), ball.into()]);
         let r = Ray::new(pt(0.0, 0.0, -3.0), v(0.0, -twosqrttwo(), twosqrttwo()));
         let xs = vec![Intersection::new(twosqrt(), &*w.objects[2])];
@@ -541,7 +543,9 @@ mod tests {
         let mut material = Material::new();
         material.color = Color::new(1.0, 0.0, 0.0);
         material.ambient = 0.5;
-        let ball = spheretm(Matrix4x4::translation(0.0, -3.5, -0.5), material);
+        let ball = Sphere::new()
+            .transform(Matrix4x4::translation(0.0, -3.5, -0.5))
+            .material(material);
         w.objects.append(&mut vec![floor.into(), ball.into()]);
         let xs = vec![Intersection::new(twosqrt(), &*w.objects[2])];
         let i = xs[0].clone();
@@ -555,7 +559,7 @@ mod tests {
         // the hit should offset the point
         let r = Ray::new(pt(0.0, 0.0, -5.0), v(0.0, 0.0, 1.0));
         let transform = Matrix4x4::translation(0.0, 0.0, 1.0);
-        let shape = spheret(transform);
+        let shape = Sphere::new().transform(transform);
         let i = Intersection::new(5.0, &shape);
         let comps = i.prepare_computations(&r, &vec![i.clone()]);
         // compares over_point's z component to half of -EPISLON to make sure

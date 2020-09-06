@@ -1,4 +1,4 @@
-use crate::{world_to_object, Color, Matrix4x4, Shape, Tuple};
+use crate::{Color, Matrix4x4, Shape, Tuple};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum PatternDesign {
@@ -55,7 +55,7 @@ impl Pattern {
     }
 
     pub fn pattern_at_object(&self, object: &dyn Shape, world_point: Tuple) -> Color {
-        let object_point = world_to_object(object, world_point);
+        let object_point = object.world_to_object(world_point);
         let pattern_point = self.transform.inverse().unwrap() * object_point;
         self.pattern_at(pattern_point)
     }
@@ -106,7 +106,7 @@ pub fn test_pattern() -> Pattern {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{black, pt, sphere, spheret, white, Matrix4x4};
+    use crate::{black, pt, white, Matrix4x4, Sphere};
 
     #[test]
     fn pattern_default() {
@@ -119,13 +119,13 @@ mod tests {
         assert_eq!(pattern.transform, Matrix4x4::translation(1.0, 2.0, 3.0));
 
         // a pattern with an object transformation
-        let shape = spheret(Matrix4x4::scaling(2.0, 2.0, 2.0));
+        let shape = Sphere::new().transform(Matrix4x4::scaling(2.0, 2.0, 2.0));
         let pattern = test_pattern();
         let c = pattern.pattern_at_object(&shape, pt(2.0, 3.0, 4.0));
         assert_eq!(c, Color::new(1.0, 1.5, 2.0));
 
         // a pattern with a pattern transformation
-        let shape = spheret(Matrix4x4::scaling(2.0, 2.0, 2.0));
+        let shape = Sphere::new().transform(Matrix4x4::scaling(2.0, 2.0, 2.0));
         let mut pattern = test_pattern();
         pattern.transform = Matrix4x4::translation(0.5, 1.0, 1.5);
         let c = pattern.pattern_at_object(&shape, pt(2.5, 3.0, 3.5));
@@ -162,19 +162,19 @@ mod tests {
     #[test]
     fn pattern_transformations() {
         // stripes with an object transformation
-        let object = spheret(Matrix4x4::scaling(2.0, 2.0, 2.0));
+        let object = Sphere::new().transform(Matrix4x4::scaling(2.0, 2.0, 2.0));
         let pattern = stripe_pattern(white(), black());
         let c = pattern.pattern_at_object(&object, pt(1.5, 0.0, 0.0));
         assert_eq!(c, white());
 
         // stripes with a pattern tranformation
-        let object = sphere();
+        let object = Sphere::new();
         let pattern = stripe_patternt(white(), black(), Matrix4x4::scaling(2.0, 2.0, 2.0));
         let c = pattern.pattern_at_object(&object, pt(1.5, 0.0, 0.0));
         assert_eq!(c, white());
 
         // stripes with both an object and a pattern transformation
-        let object = spheret(Matrix4x4::scaling(2.0, 2.0, 2.0));
+        let object = Sphere::new().transform(Matrix4x4::scaling(2.0, 2.0, 2.0));
         let pattern = stripe_patternt(white(), black(), Matrix4x4::scaling(2.0, 2.0, 2.0));
         let c = pattern.pattern_at_object(&object, pt(2.5, 0.0, 0.0));
         assert_eq!(c, white());

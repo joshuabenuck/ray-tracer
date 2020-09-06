@@ -1,6 +1,6 @@
 use ray_tracer::{
-    gradient_pattern, planem, pt, ring_pattern, spheretm, stripe_pattern, v, view_transform,
-    Camera, Color, Material, Matrix4x4, PointLight, World,
+    gradient_pattern, planem, pt, ring_pattern, stripe_pattern, v, view_transform, Camera, Color,
+    Material, Matrix4x4, PointLight, Sphere, World,
 };
 use std::f64::consts::PI;
 
@@ -37,7 +37,7 @@ fn main() -> Result<(), std::io::Error> {
     material.pattern = pattern;
     material.diffuse = 0.7;
     material.specular = 0.3;
-    let middle = spheretm(transform, material);
+    let middle = Sphere::new().transform(transform).material(material);
 
     let transform = Matrix4x4::translation(1.5, 0.50, -0.50) * Matrix4x4::scaling(0.5, 0.5, 0.5);
     let mut material = Material::new();
@@ -49,7 +49,7 @@ fn main() -> Result<(), std::io::Error> {
     material.pattern = pattern;
     material.diffuse = 0.7;
     material.specular = 0.3;
-    let right = spheretm(transform, material);
+    let right = Sphere::new().transform(transform).material(material);
 
     let transform =
         Matrix4x4::translation(-1.5, 0.33, -0.75) * Matrix4x4::scaling(0.33, 0.33, 0.33);
@@ -62,7 +62,7 @@ fn main() -> Result<(), std::io::Error> {
     material.pattern = pattern;
     material.diffuse = 0.7;
     material.specular = 0.3;
-    let left = spheretm(transform, material);
+    let left = Sphere::new().transform(transform).material(material);
 
     let mut world = World::empty();
     world.lights.push(PointLight::new(
