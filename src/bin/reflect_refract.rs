@@ -108,8 +108,19 @@ fn main() -> Result<(), std::io::Error> {
     let mut world = World::empty();
     world.lights.push(light);
     world.objects = vec![
-        floor, ceiling, west_wall, east_wall, north_wall, south_wall, sphere1, sphere2, sphere3,
-        sphere4, red, blue, green,
+        floor.into(),
+        ceiling.into(),
+        west_wall.into(),
+        east_wall.into(),
+        north_wall.into(),
+        south_wall.into(),
+        sphere1.into(),
+        sphere2.into(),
+        sphere3.into(),
+        sphere4.into(),
+        red.into(),
+        blue.into(),
+        green.into(),
     ];
     let image = camera.render(&world);
     std::fs::write("./reflect_refract.ppm", image.to_ppm())

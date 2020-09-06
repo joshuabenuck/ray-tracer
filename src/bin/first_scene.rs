@@ -69,7 +69,7 @@ fn main() -> Result<(), std::io::Error> {
         pt(-10.0, 10.0, -10.0),
         Color::new(1.0, 1.0, 1.0),
     ));
-    world.objects = vec![floor, middle, left, right];
+    world.objects = vec![floor.into(), middle.into(), left.into(), right.into()];
 
     let mut camera = Camera::new(400, 200, PI / 3.0);
     camera.transform = view_transform(pt(0.0, 1.5, -5.0), pt(0.0, 1.0, 0.0), v(0.0, 1.0, 0.0));

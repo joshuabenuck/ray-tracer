@@ -1,5 +1,4 @@
 use crate::{world_to_object, Color, Matrix4x4, Shape, Tuple};
-use std::{cell::RefCell, rc::Rc};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum PatternDesign {
@@ -55,7 +54,7 @@ impl Pattern {
         }
     }
 
-    pub fn pattern_at_object(&self, object: &Rc<RefCell<Shape>>, world_point: Tuple) -> Color {
+    pub fn pattern_at_object(&self, object: &dyn Shape, world_point: Tuple) -> Color {
         let object_point = world_to_object(object, world_point);
         let pattern_point = self.transform.inverse().unwrap() * object_point;
         self.pattern_at(pattern_point)

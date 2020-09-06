@@ -1,6 +1,4 @@
 use crate::{Color, Pattern, PointLight, Shape, Tuple};
-use std::cell::RefCell;
-use std::rc::Rc;
 
 pub fn m() -> Material {
     Material::new()
@@ -82,7 +80,7 @@ impl Material {
 
 pub fn lighting(
     material: &Material,
-    object: &Rc<RefCell<Shape>>,
+    object: &dyn Shape,
     light: &PointLight,
     point: &Tuple,
     eyev: &Tuple,

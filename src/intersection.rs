@@ -1,5 +1,4 @@
 use crate::{normal_at, Ray, Shape, Tuple, EPSILON};
-use std::{cell::RefCell, rc::Rc};
 
 pub fn schlick(comps: &Comps) -> f64 {
     // find the cosine of the angle between the eye and the normal vectors
@@ -24,9 +23,9 @@ pub fn schlick(comps: &Comps) -> f64 {
     r0 + (1.0 - r0) * (1.0 - cos).powi(5)
 }
 
-pub struct Comps {
+pub struct Comps<'a> {
     pub t: f64,
-    pub object: Rc<RefCell<Shape>>,
+    pub object: &'a dyn Shape,
     pub point: Tuple,
     pub eyev: Tuple,
     pub normalv: Tuple,
@@ -38,18 +37,24 @@ pub struct Comps {
     pub n2: f64,
 }
 
-#[derive(Clone, PartialEq)]
-pub struct Intersection {
+#[derive(Clone)]
+pub struct Intersection<'a> {
     pub t: f64,
-    pub object: Rc<RefCell<Shape>>,
+    pub object: &'a dyn Shape,
 }
 
-impl Intersection {
-    pub fn new(t: f64, object: Rc<RefCell<Shape>>) -> Intersection {
+impl PartialEq for Intersection<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.t == other.t && self.object == other.object
+    }
+}
+
+impl<'a> Intersection<'a> {
+    pub fn new(t: f64, object: &'a dyn Shape) -> Intersection<'a> {
         Intersection { t, object }
     }
 
-    pub fn prepare_computations(&self, ray: &Ray, xs: Vec<Intersection>) -> Comps {
+    pub fn prepare_computations(&self, ray: &Ray, xs: &Vec<Intersection>) -> Comps {
         // copy the intersection's properties, for convenience
         let t = self.t;
         let object = self.object.clone();
@@ -57,7 +62,7 @@ impl Intersection {
         // precompute some useful values
         let point = ray.position(t);
         let eyev = -ray.direction;
-        let normalv = normal_at(&object, point);
+        let normalv = normal_at(object, point);
         let inside = normalv.dot(&eyev) < 0.0;
         let normalv = if inside { -normalv } else { normalv };
         let reflectv = ray.direction.reflect(&normalv);
@@ -66,38 +71,28 @@ impl Intersection {
 
         let mut n1 = 1.0;
         let mut n2 = 1.0;
-        let mut containers: Vec<Rc<RefCell<Shape>>> = Vec::new();
+        let mut containers: Vec<&dyn Shape> = Vec::new();
         for i in xs {
-            if i == *self {
+            if i == self {
                 if containers.len() == 0 {
                     n1 = 1.0;
                 } else {
-                    n1 = containers
-                        .last()
-                        .unwrap()
-                        .borrow()
-                        .material
-                        .refractive_index;
+                    n1 = containers.last().unwrap().material().refractive_index;
                 }
             }
 
-            let pos = containers.iter().position(|c| c == &i.object);
+            let pos = containers.iter().position(|c| &&**c == &i.object);
             if let Some(pos) = pos {
                 containers.remove(pos);
             } else {
-                containers.push(i.object.clone());
+                containers.push(i.object);
             }
 
-            if i == *self {
+            if i == self {
                 if containers.len() == 0 {
                     n2 = 1.0;
                 } else {
-                    n2 = containers
-                        .last()
-                        .unwrap()
-                        .borrow()
-                        .material
-                        .refractive_index;
+                    n2 = containers.last().unwrap().material().refractive_index;
                 }
                 break;
             }
@@ -121,11 +116,11 @@ impl Intersection {
 }
 
 pub trait Intersections {
-    fn hit(&self) -> Option<&Intersection>;
+    fn hit(&self) -> Option<&Intersection<'_>>;
 }
 
-impl Intersections for Vec<Intersection> {
-    fn hit(&self) -> Option<&Intersection> {
+impl Intersections for Vec<Intersection<'_>> {
+    fn hit(&self) -> Option<&Intersection<'_>> {
         if self.len() == 0 {
             return None;
         }
@@ -147,14 +142,14 @@ mod tests {
     fn intersection() {
         // an intersection encapsulates t and object
         let s = sphere();
-        let i = Intersection::new(3.5, s.clone());
+        let i = Intersection::new(3.5, &s);
         assert_eq!(3.5, i.t);
-        // assert_eq!(i.object, s);
+        assert_eq!(i.object, &s as &dyn Shape);
 
         // aggregate intersections
         let s = sphere();
-        let i1 = Intersection::new(1.0, s.clone());
-        let i2 = Intersection::new(2.0, s.clone());
+        let i1 = Intersection::new(1.0, &s);
+        let i2 = Intersection::new(2.0, &s);
         let mut xs = [i1, i2];
         xs.sort_by(|a, b| a.t.partial_cmp(&b.t).unwrap());
         assert_eq!(xs.len(), 2);
@@ -163,34 +158,34 @@ mod tests {
 
         // the hit when all intersections have positive t
         let s = sphere();
-        let i1 = Intersection::new(1.0, s.clone());
-        let i2 = Intersection::new(2.0, s.clone());
+        let i1 = Intersection::new(1.0, &s);
+        let i2 = Intersection::new(2.0, &s);
         let mut xs = vec![i2.clone(), i1.clone()];
         xs.sort_by(|a, b| a.t.partial_cmp(&b.t).unwrap());
         let i = xs.hit();
         assert!(*i.unwrap() == i1);
 
         // the hit when intersections have negative t
-        let i1 = Intersection::new(-1.0, s.clone());
-        let i2 = Intersection::new(1.0, s.clone());
+        let i1 = Intersection::new(-1.0, &s);
+        let i2 = Intersection::new(1.0, &s);
         let mut xs = vec![i2.clone(), i1.clone()];
         xs.sort_by(|a, b| a.t.partial_cmp(&b.t).unwrap());
         let i = xs.hit();
         assert!(*i.unwrap() == i2);
 
         // the hit when all intersections have negative t
-        let i1 = Intersection::new(-2.0, s.clone());
-        let i2 = Intersection::new(-1.0, s.clone());
+        let i1 = Intersection::new(-2.0, &s);
+        let i2 = Intersection::new(-1.0, &s);
         let mut xs = vec![i2, i1];
         xs.sort_by(|a, b| a.t.partial_cmp(&b.t).unwrap());
         let i = xs.hit();
         assert!(i == None);
 
         // the hit is always the lowest non-negative intersection
-        let i1 = Intersection::new(5.0, s.clone());
-        let i2 = Intersection::new(7.0, s.clone());
-        let i3 = Intersection::new(-3.0, s.clone());
-        let i4 = Intersection::new(2.0, s.clone());
+        let i1 = Intersection::new(5.0, &s);
+        let i2 = Intersection::new(7.0, &s);
+        let i3 = Intersection::new(-3.0, &s);
+        let i4 = Intersection::new(2.0, &s);
         let mut xs = vec![i1, i2, i3, i4.clone()];
         xs.sort_by(|a, b| a.t.partial_cmp(&b.t).unwrap());
         let i = xs.hit();
@@ -202,8 +197,8 @@ mod tests {
         // precomputing the state of an interesection
         let r = Ray::new(pt(0.0, 0.0, -5.0), v(0.0, 0.0, 1.0));
         let shape = sphere();
-        let i = Intersection::new(4.0, shape.clone());
-        let comps = i.prepare_computations(&r, vec![i.clone()]);
+        let i = Intersection::new(4.0, &shape);
+        let comps = i.prepare_computations(&r, &vec![i.clone()]);
         assert_eq!(comps.t, i.t);
         assert_eq!(comps.point, pt(0.0, 0.0, -1.0));
         assert_eq!(comps.eyev, v(0.0, 0.0, -1.0));
@@ -214,8 +209,8 @@ mod tests {
 
         // the hit, when an intersection occurs on the inside
         let r = Ray::new(pt(0.0, 0.0, 0.0), v(0.0, 0.0, 1.0));
-        let i = Intersection::new(1.0, shape.clone());
-        let comps = i.prepare_computations(&r, vec![i.clone()]);
+        let i = Intersection::new(1.0, &shape);
+        let comps = i.prepare_computations(&r, &vec![i.clone()]);
         assert_eq!(comps.t, i.t);
         assert_eq!(comps.point, pt(0.0, 0.0, 1.0));
         assert_eq!(comps.eyev, v(0.0, 0.0, -1.0));
@@ -229,8 +224,8 @@ mod tests {
             pt(0.0, 1.0, -1.0),
             v(0.0, -2.0_f64.sqrt() / 2.0, 2.0_f64.sqrt() / 2.0),
         );
-        let i = Intersection::new(2.0_f64.sqrt(), shape.clone());
-        let comps = i.prepare_computations(&r, vec![i.clone()]);
+        let i = Intersection::new(2.0_f64.sqrt(), &shape);
+        let comps = i.prepare_computations(&r, &vec![i.clone()]);
         assert_eq!(
             comps.reflectv,
             v(0.0, 2.0_f64.sqrt() / 2.0, 2.0_f64.sqrt() / 2.0)
@@ -240,41 +235,41 @@ mod tests {
     #[test]
     fn intersections_n1_n2() {
         let a = glass_spheret(Matrix4x4::scaling(2.0, 2.0, 2.0));
-        let b = glass_spheret(Matrix4x4::translation(0.0, 0.0, -0.25));
-        b.borrow_mut().material.refractive_index = 2.0;
-        let c = glass_spheret(Matrix4x4::translation(0.0, 0.0, 0.25));
-        c.borrow_mut().material.refractive_index = 2.5;
+        let mut b = glass_spheret(Matrix4x4::translation(0.0, 0.0, -0.25));
+        b.material_mut().refractive_index = 2.0;
+        let mut c = glass_spheret(Matrix4x4::translation(0.0, 0.0, 0.25));
+        c.material_mut().refractive_index = 2.5;
         let r = Ray::new(pt(0.0, 0.0, -4.0), v(0.0, 0.0, 1.0));
         let xs = vec![
-            Intersection::new(2.0, a.clone()),
-            Intersection::new(2.75, b.clone()),
-            Intersection::new(3.25, c.clone()),
-            Intersection::new(4.75, b),
-            Intersection::new(5.25, c),
-            Intersection::new(6.0, a),
+            Intersection::new(2.0, &a),
+            Intersection::new(2.75, &b),
+            Intersection::new(3.25, &c),
+            Intersection::new(4.75, &b),
+            Intersection::new(5.25, &c),
+            Intersection::new(6.0, &a),
         ];
         let i = &xs[0];
-        let comps = i.prepare_computations(&r, xs.clone());
+        let comps = i.prepare_computations(&r, &xs);
         assert_eq!(comps.n1, 1.0);
         assert_eq!(comps.n2, 1.5);
         let i = &xs[1];
-        let comps = i.prepare_computations(&r, xs.clone());
+        let comps = i.prepare_computations(&r, &xs);
         assert_eq!(comps.n1, 1.5);
         assert_eq!(comps.n2, 2.0);
         let i = &xs[2];
-        let comps = i.prepare_computations(&r, xs.clone());
+        let comps = i.prepare_computations(&r, &xs);
         assert_eq!(comps.n1, 2.0);
         assert_eq!(comps.n2, 2.5);
         let i = &xs[3];
-        let comps = i.prepare_computations(&r, xs.clone());
+        let comps = i.prepare_computations(&r, &xs);
         assert_eq!(comps.n1, 2.5);
         assert_eq!(comps.n2, 2.5);
         let i = &xs[4];
-        let comps = i.prepare_computations(&r, xs.clone());
+        let comps = i.prepare_computations(&r, &xs);
         assert_eq!(comps.n1, 2.5);
         assert_eq!(comps.n2, 1.5);
         let i = &xs[5];
-        let comps = i.prepare_computations(&r, xs.clone());
+        let comps = i.prepare_computations(&r, &xs);
         assert_eq!(comps.n1, 1.5);
         assert_eq!(comps.n2, 1.0);
     }
@@ -284,9 +279,9 @@ mod tests {
         // the under point is offset below the surface
         let r = Ray::new(pt(0.0, 0.0, -5.0), v(0.0, 0.0, 1.0));
         let shape = glass_spheret(Matrix4x4::translation(0.0, 0.0, 1.0));
-        let i = Intersection::new(5.0, shape);
+        let i = Intersection::new(5.0, &shape);
         let xs = vec![i.clone()];
-        let comps = i.prepare_computations(&r, xs);
+        let comps = i.prepare_computations(&r, &xs);
         assert_eq!(comps.under_point.z > EPSILON / 2.0, true);
         assert_eq!(comps.point.z < comps.under_point.z, true);
     }
@@ -297,11 +292,11 @@ mod tests {
         let shape = glass_sphere();
         let r = Ray::new(pt(0.0, 0.0, 2.0_f64.sqrt() / 2.0), v(0.0, 1.0, 0.0));
         let xs = vec![
-            Intersection::new(-2.0_f64.sqrt() / 2.0, shape.clone()),
-            Intersection::new(2.0_f64.sqrt() / 2.0, shape),
+            Intersection::new(-2.0_f64.sqrt() / 2.0, &shape),
+            Intersection::new(2.0_f64.sqrt() / 2.0, &shape),
         ];
         let i = xs[1].clone();
-        let comps = i.prepare_computations(&r, xs);
+        let comps = i.prepare_computations(&r, &xs);
         let reflectance = schlick(&comps);
         // total internal feflection means all the light is reflected
         // and none is refracted. The fraction of the light that is
@@ -312,20 +307,20 @@ mod tests {
         let shape = glass_sphere();
         let r = Ray::new(pt(0.0, 0.0, 0.0), v(0.0, 1.0, 0.0));
         let xs = vec![
-            Intersection::new(-1.0, shape.clone()),
-            Intersection::new(1.0, shape),
+            Intersection::new(-1.0, &shape),
+            Intersection::new(1.0, &shape),
         ];
         let i = xs[1].clone();
-        let comps = i.prepare_computations(&r, xs);
+        let comps = i.prepare_computations(&r, &xs);
         let reflectance = schlick(&comps);
         assert_eq!(equal(reflectance, 0.04), true);
 
         // the schlick approximation with small angle and n2 > n1
         let shape = glass_sphere();
         let r = Ray::new(pt(0.0, 0.99, -2.0), v(0.0, 0.0, 1.0));
-        let xs = vec![Intersection::new(1.8589, shape)];
+        let xs = vec![Intersection::new(1.8589, &shape)];
         let i = xs[0].clone();
-        let comps = i.prepare_computations(&r, xs);
+        let comps = i.prepare_computations(&r, &xs);
         let reflectance = schlick(&comps);
         assert_eq!(
             equal(reflectance, 0.48873),

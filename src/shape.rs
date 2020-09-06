@@ -1,126 +1,199 @@
 use crate::{equal, pt, v, Intersection, Material, Matrix4x4, Ray, Tuple, EPSILON};
-use std::{cell::RefCell, fmt::Debug, rc::Rc};
+use std::any::Any;
+use std::fmt::Debug;
 
 #[derive(Clone)]
-pub enum ShapeForm {
-    Sphere,
-    Plane,
-    Cube,
-    Cylinder(f64, f64, bool),
-    Group(Vec<Rc<RefCell<Shape>>>),
-    Triangle { p1: Tuple, p2: Tuple, p3: Tuple },
-    Test,
+pub struct Props {
+    pub transform: Matrix4x4,
+    pub material: Material,
+    // pub parent: Option<Box<dyn Shape>>,
 }
 
-impl Debug for ShapeForm {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "ShapeForm {{ }}")
-    }
-}
-
-impl PartialEq for ShapeForm {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (ShapeForm::Sphere, ShapeForm::Sphere) => true,
-            (ShapeForm::Plane, ShapeForm::Plane) => true,
-            (ShapeForm::Cube, ShapeForm::Cube) => true,
-            (ShapeForm::Cylinder(..), ShapeForm::Cylinder(..)) => true,
-            (ShapeForm::Group(_), ShapeForm::Group(_)) => true,
-            (ShapeForm::Test, ShapeForm::Test) => true,
-            _ => false,
+impl Default for Props {
+    fn default() -> Props {
+        Props {
+            transform: Matrix4x4::identity(),
+            material: Material::new(),
+            // parent: None,
         }
     }
 }
 
-#[derive(Clone)]
-pub struct Shape {
-    pub transform: Matrix4x4,
-    pub material: Material,
-    pub form: ShapeForm,
-    pub parent: Option<Rc<RefCell<Shape>>>,
-}
-
-impl Debug for Shape {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Shape {{ {:?} {:?} }}", self.transform, self.material)
-    }
-}
-
-impl PartialEq for Shape {
+impl PartialEq for Props {
     fn eq(&self, other: &Self) -> bool {
-        self.transform == other.transform
-            && self.material == other.material
-            && self.form == other.form
+        self.transform == other.transform && self.material == other.material
     }
 }
+
+impl Debug for Props {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Props {{ }}")
+    }
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub struct Sphere {
+    props: Props,
+}
+#[derive(PartialEq, Debug)]
+pub struct Plane {
+    props: Props,
+}
+#[derive(PartialEq, Debug)]
+pub struct Cube {
+    props: Props,
+}
+#[derive(PartialEq, Debug)]
+pub struct Cylinder {
+    props: Props,
+    min: f64,
+    max: f64,
+    closed: bool,
+}
+
+// pub struct Group<'a> {
+//     props: Props,
+//     children: Vec<Box<dyn Shape + 'a>>,
+// }
+
+#[derive(PartialEq)]
+pub struct Triangle {
+    props: Props,
+    p1: Tuple,
+    p2: Tuple,
+    p3: Tuple,
+}
+
+pub trait Shape {
+    fn as_any(&self) -> &dyn Any;
+    fn shape_eq(&self, other: &dyn Any) -> bool;
+    fn intersect(&'_ self, ray: &Ray) -> Vec<Intersection<'_>> {
+        let ray = ray.transform(self.transform().inverse().unwrap());
+        self.local_intersect(&ray)
+    }
+    fn local_intersect(&'_ self, ray: &Ray) -> Vec<Intersection<'_>>;
+    fn local_normal_at(&self, local_point: Tuple) -> Tuple;
+    fn common(&self) -> &Props;
+    fn common_mut(&mut self) -> &mut Props;
+    fn transform(&self) -> &Matrix4x4 {
+        &self.common().transform
+    }
+    fn transform_mut(&mut self) -> &mut Matrix4x4 {
+        &mut self.common_mut().transform
+    }
+    fn set_transform(&mut self, transform: Matrix4x4) {
+        self.common_mut().transform = transform;
+    }
+    fn material(&self) -> &Material {
+        &self.common().material
+    }
+    fn material_mut(&mut self) -> &mut Material {
+        &mut self.common_mut().material
+    }
+    fn set_material(&mut self, material: Material) {
+        self.common_mut().material = material;
+    }
+}
+
+#[derive(PartialEq)]
+pub struct TestShape {
+    props: Props,
+}
+
+impl TestShape {
+    fn as_shape(&self) -> &dyn Shape {
+        self
+    }
+}
+
+impl Debug for dyn Shape + '_ {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Shape {{ {:?} {:?} }}",
+            self.transform(),
+            self.material()
+        )
+    }
+}
+
+impl PartialEq for dyn Shape + '_ {
+    fn eq(&self, other: &Self) -> bool {
+        self.common() == other.common() && self.shape_eq(other.as_any())
+    }
+}
+
+// impl PartialEq for Shape {
+//     fn eq(&self, other: &Self) -> bool {
+//         self.transform == other.transform
+//             && self.material == other.material
+//             && self.form == other.form
+//     }
+// }
 
 static mut SAVED_RAY: Option<Ray> = None;
 
-pub fn test_shape() -> Rc<RefCell<Shape>> {
-    Rc::new(RefCell::new(Shape {
-        transform: Matrix4x4::identity(),
-        material: Material::new(),
-        form: ShapeForm::Test,
-        parent: None,
-    }))
+pub fn test_shape() -> TestShape {
+    TestShape {
+        props: Props::default(),
+    }
 }
 
 #[inline]
-pub fn plane() -> Rc<RefCell<Shape>> {
-    Rc::new(RefCell::new(Shape {
-        transform: Matrix4x4::identity(),
-        material: Material::new(),
-        form: ShapeForm::Plane,
-        parent: None,
-    }))
+pub fn plane() -> Plane {
+    Plane {
+        props: Props::default(),
+    }
 }
 
 #[inline]
-pub fn planet(transform: Matrix4x4) -> Rc<RefCell<Shape>> {
+pub fn planet(transform: Matrix4x4) -> Plane {
     planetm(transform, Material::new())
 }
 
 #[inline]
-pub fn planem(material: Material) -> Rc<RefCell<Shape>> {
+pub fn planem(material: Material) -> Plane {
     planetm(Matrix4x4::identity(), material)
 }
 
 #[inline]
-pub fn planetm(transform: Matrix4x4, material: Material) -> Rc<RefCell<Shape>> {
-    Rc::new(RefCell::new(Shape {
-        material,
-        transform,
-        form: ShapeForm::Plane,
-        parent: None,
-    }))
+pub fn planetm(transform: Matrix4x4, material: Material) -> Plane {
+    Plane {
+        props: Props {
+            transform,
+            material,
+            ..Props::default()
+        },
+    }
 }
 
 #[inline]
-pub fn sphere() -> Rc<RefCell<Shape>> {
+pub fn sphere() -> Sphere {
     spheretm(Matrix4x4::identity(), Material::new())
 }
 
-pub fn spheretm(transform: Matrix4x4, material: Material) -> Rc<RefCell<Shape>> {
-    Rc::new(RefCell::new(Shape {
-        transform,
-        material,
-        form: ShapeForm::Sphere,
-        parent: None,
-    }))
+pub fn spheretm(transform: Matrix4x4, material: Material) -> Sphere {
+    Sphere {
+        props: Props {
+            transform,
+            material,
+            ..Props::default()
+        },
+    }
 }
 
 #[inline]
-pub fn spheret(transform: Matrix4x4) -> Rc<RefCell<Shape>> {
+pub fn spheret(transform: Matrix4x4) -> Sphere {
     spheretm(transform, Material::new())
 }
 
 #[inline]
-pub fn spherem(material: Material) -> Rc<RefCell<Shape>> {
+pub fn spherem(material: Material) -> Sphere {
     spheretm(Matrix4x4::identity(), material)
 }
 
 #[inline]
-pub fn glass_sphere() -> Rc<RefCell<Shape>> {
+pub fn glass_sphere() -> Sphere {
     let mut m = Material::new();
     m.transparency = 1.0;
     m.refractive_index = 1.5;
@@ -128,7 +201,7 @@ pub fn glass_sphere() -> Rc<RefCell<Shape>> {
 }
 
 #[inline]
-pub fn glass_spheret(transform: Matrix4x4) -> Rc<RefCell<Shape>> {
+pub fn glass_spheret(transform: Matrix4x4) -> Sphere {
     let mut m = Material::new();
     m.transparency = 1.0;
     m.refractive_index = 1.5;
@@ -136,42 +209,43 @@ pub fn glass_spheret(transform: Matrix4x4) -> Rc<RefCell<Shape>> {
 }
 
 #[inline]
-pub fn cube() -> Rc<RefCell<Shape>> {
+pub fn cube() -> Cube {
     cubetm(Matrix4x4::identity(), Material::new())
 }
 
 #[inline]
-pub fn cubet(transform: Matrix4x4) -> Rc<RefCell<Shape>> {
+pub fn cubet(transform: Matrix4x4) -> Cube {
     cubetm(transform, Material::new())
 }
 
 #[inline]
-pub fn cubem(material: Material) -> Rc<RefCell<Shape>> {
+pub fn cubem(material: Material) -> Cube {
     cubetm(Matrix4x4::identity(), material)
 }
 
 #[inline]
-pub fn cubetm(transform: Matrix4x4, material: Material) -> Rc<RefCell<Shape>> {
-    Rc::new(RefCell::new(Shape {
-        transform,
-        material,
-        form: ShapeForm::Cube,
-        parent: None,
-    }))
+pub fn cubetm(transform: Matrix4x4, material: Material) -> Cube {
+    Cube {
+        props: Props {
+            transform,
+            material,
+            ..Props::default()
+        },
+    }
 }
 
 #[inline]
-pub fn cylinder(min: f64, max: f64, closed: bool) -> Rc<RefCell<Shape>> {
+pub fn cylinder(min: f64, max: f64, closed: bool) -> Cylinder {
     cylindertm(Matrix4x4::identity(), Material::new(), min, max, closed)
 }
 
 #[inline]
-pub fn cylindert(transform: Matrix4x4, min: f64, max: f64, closed: bool) -> Rc<RefCell<Shape>> {
+pub fn cylindert(transform: Matrix4x4, min: f64, max: f64, closed: bool) -> Cylinder {
     cylindertm(transform, Material::new(), min, max, closed)
 }
 
 #[inline]
-pub fn cylinderm(material: Material, min: f64, max: f64, closed: bool) -> Rc<RefCell<Shape>> {
+pub fn cylinderm(material: Material, min: f64, max: f64, closed: bool) -> Cylinder {
     cylindertm(Matrix4x4::identity(), material, min, max, closed)
 }
 
@@ -182,49 +256,44 @@ pub fn cylindertm(
     min: f64,
     max: f64,
     closed: bool,
-) -> Rc<RefCell<Shape>> {
-    Rc::new(RefCell::new(Shape {
-        transform,
-        material,
-        form: ShapeForm::Cylinder(min, max, closed),
-        parent: None,
-    }))
+) -> Cylinder {
+    Cylinder {
+        props: Props {
+            transform,
+            material,
+            ..Props::default()
+        },
+        min,
+        max,
+        closed,
+    }
 }
+
+// #[inline]
+// pub fn group<'a>() -> Group<'a> {
+//     Group {
+//         props: Props::default(),
+//         children: Vec::new(),
+//     }
+// }
+
+// pub fn add_child<'a>(group: &'a mut Group, child: Box<dyn Shape + 'a>) {
+//     // child.parent = Some(group.clone());
+//     // group.children.push(child);
+// }
+
+// pub fn children<'a>(group: &'a Group) -> &'a Vec<Box<dyn Shape + 'a>> {
+//     &group.children
+// }
 
 #[inline]
-pub fn group() -> Rc<RefCell<Shape>> {
-    Rc::new(RefCell::new(Shape {
-        transform: Matrix4x4::identity(),
-        material: Material::new(),
-        form: ShapeForm::Group(Vec::new()),
-        parent: None,
-    }))
-}
-
-pub fn add_child(group: &Rc<RefCell<Shape>>, child: Rc<RefCell<Shape>>) {
-    if let ShapeForm::Group(children) = &mut group.borrow_mut().form {
-        child.borrow_mut().parent = Some(group.clone());
-        children.push(child);
-        return;
+pub fn triangle(p1: Tuple, p2: Tuple, p3: Tuple) -> Triangle {
+    Triangle {
+        props: Props::default(),
+        p1,
+        p2,
+        p3,
     }
-    panic!("add_child may only be called on a group!");
-}
-
-pub fn children(group: &Rc<RefCell<Shape>>) -> Vec<Rc<RefCell<Shape>>> {
-    if let ShapeForm::Group(children) = &group.borrow().form {
-        return children.clone();
-    }
-    panic!("children may only be called on a group!");
-}
-
-#[inline]
-pub fn triangle(p1: Tuple, p2: Tuple, p3: Tuple) -> Rc<RefCell<Shape>> {
-    Rc::new(RefCell::new(Shape {
-        transform: Matrix4x4::identity(),
-        material: Material::new(),
-        form: ShapeForm::Triangle { p1, p2, p3 },
-        parent: None,
-    }))
 }
 
 fn check_axis(origin: f64, direction: f64) -> (f64, f64) {
@@ -256,204 +325,366 @@ fn check_cap(ray: &Ray, t: f64) -> bool {
     x.powi(2) + z.powi(2) <= 1.0
 }
 
-fn intersect_caps(cyl: &Rc<RefCell<Shape>>, ray: &Ray, xs: &mut Vec<Intersection>) {
-    match cyl.borrow().form {
-        ShapeForm::Cylinder(max, min, closed) => {
-            // caps only matter if the cylinder is closed and might
-            // possibly be interesected by the ray.
-            if !closed || equal(ray.direction.y, 0.0) {
-                return;
-            }
+fn intersect_caps<'a>(cyl: &'a Cylinder, ray: &Ray, xs: &mut Vec<Intersection<'a>>) {
+    let cyl = cyl;
+    // caps only matter if the cylinder is closed and might
+    // possibly be interesected by the ray.
+    if !cyl.closed || equal(ray.direction.y, 0.0) {
+        return;
+    }
 
-            // check for an intersection with the lower end cap by intersecting
-            // the ray with the plane at y = min
-            let t = (min - ray.origin.y) / ray.direction.y;
-            if check_cap(ray, t) {
-                xs.push(Intersection::new(t, cyl.clone()));
-            }
+    // check for an intersection with the lower end cap by intersecting
+    // the ray with the plane at y = min
+    let t = (cyl.min - ray.origin.y) / ray.direction.y;
+    if check_cap(ray, t) {
+        xs.push(Intersection::new(t, cyl));
+    }
 
-            // check for an intersection with the upper end cap by intersecting
-            // the ray with the plane at y = max
-            let t = (max - ray.origin.y) / ray.direction.y;
-            if check_cap(ray, t) {
-                xs.push(Intersection::new(t, cyl.clone()));
-            }
-        }
-        _ => unreachable!(),
+    // check for an intersection with the upper end cap by intersecting
+    // the ray with the plane at y = max
+    let t = (cyl.max - ray.origin.y) / ray.direction.y;
+    if check_cap(ray, t) {
+        xs.push(Intersection::new(t, cyl));
     }
 }
 
-pub fn intersect(shape: &Rc<RefCell<Shape>>, ray: &Ray) -> Vec<Intersection> {
-    let ray = ray.transform(shape.borrow().transform.inverse().unwrap());
-    local_intersect(shape, &ray)
+impl Shape for TestShape {
+    fn local_intersect(&'_ self, ray: &Ray) -> Vec<Intersection<'_>> {
+        unsafe {
+            SAVED_RAY = Some(*ray);
+        }
+        Vec::new()
+    }
+
+    fn local_normal_at(&self, local_point: Tuple) -> Tuple {
+        v(local_point.x, local_point.y, local_point.z)
+    }
+
+    fn common(&self) -> &Props {
+        &self.props
+    }
+
+    fn common_mut(&mut self) -> &mut Props {
+        &mut self.props
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn shape_eq(&self, other: &dyn Any) -> bool {
+        match other.downcast_ref::<Self>() {
+            Some(_) => true,
+            None => false,
+        }
+    }
 }
 
-pub fn local_intersect(shape: &Rc<RefCell<Shape>>, ray: &Ray) -> Vec<Intersection> {
-    match &shape.borrow().form {
-        ShapeForm::Test => {
-            unsafe {
-                SAVED_RAY = Some(*ray);
-            }
+impl Shape for Sphere {
+    fn local_intersect(&'_ self, ray: &Ray) -> Vec<Intersection<'_>> {
+        let sphere_to_ray = ray.origin - pt(0.0, 0.0, 0.0);
+
+        let a = ray.direction.dot(&ray.direction);
+        let b = 2.0 * ray.direction.dot(&sphere_to_ray);
+        let c = sphere_to_ray.dot(&sphere_to_ray) - 1.0;
+
+        let discriminant = (b * b) - 4.0 * a * c;
+
+        if discriminant < 0.0 {
+            return Vec::new();
+        }
+
+        let t1 = (-b - discriminant.sqrt()) / (2.0 * a);
+        let t2 = (-b + discriminant.sqrt()) / (2.0 * a);
+        vec![Intersection::new(t1, self), Intersection::new(t2, self)]
+    }
+
+    fn local_normal_at(&self, local_point: Tuple) -> Tuple {
+        local_point - pt(0.0, 0.0, 0.0)
+    }
+
+    fn common(&self) -> &Props {
+        &self.props
+    }
+
+    fn common_mut(&mut self) -> &mut Props {
+        &mut self.props
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn shape_eq(&self, other: &dyn Any) -> bool {
+        match other.downcast_ref::<Self>() {
+            Some(_) => true,
+            None => false,
+        }
+    }
+}
+
+impl Shape for Plane {
+    fn local_intersect(&'_ self, ray: &Ray) -> Vec<Intersection<'_>> {
+        if ray.direction.y.abs() < EPSILON {
             Vec::new()
+        } else {
+            let t = -ray.origin.y / ray.direction.y;
+            vec![Intersection::new(t, self)]
         }
-        ShapeForm::Sphere => {
-            let sphere_to_ray = ray.origin - pt(0.0, 0.0, 0.0);
+    }
 
-            let a = ray.direction.dot(&ray.direction);
-            let b = 2.0 * ray.direction.dot(&sphere_to_ray);
-            let c = sphere_to_ray.dot(&sphere_to_ray) - 1.0;
+    fn local_normal_at(&self, _local_point: Tuple) -> Tuple {
+        v(0.0, 1.0, 0.0)
+    }
 
-            let discriminant = (b * b) - 4.0 * a * c;
+    fn common(&self) -> &Props {
+        &self.props
+    }
 
-            if discriminant < 0.0 {
-                return Vec::new();
-            }
+    fn common_mut(&mut self) -> &mut Props {
+        &mut self.props
+    }
 
-            let t1 = (-b - discriminant.sqrt()) / (2.0 * a);
-            let t2 = (-b + discriminant.sqrt()) / (2.0 * a);
-            vec![
-                Intersection::new(t1, shape.clone()),
-                Intersection::new(t2, shape.clone()),
-            ]
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn shape_eq(&self, other: &dyn Any) -> bool {
+        match other.downcast_ref::<Self>() {
+            Some(_) => true,
+            None => false,
         }
-        ShapeForm::Plane => {
-            if ray.direction.y.abs() < EPSILON {
-                Vec::new()
-            } else {
-                let t = -ray.origin.y / ray.direction.y;
-                vec![Intersection::new(t, shape.clone())]
-            }
+    }
+}
+
+impl Shape for Cube {
+    fn local_intersect(&'_ self, ray: &Ray) -> Vec<Intersection<'_>> {
+        // How to avoid always doing all of these computations?
+        let (xtmin, xtmax) = check_axis(ray.origin.x, ray.direction.x);
+        let (ytmin, ytmax) = check_axis(ray.origin.y, ray.direction.y);
+        let (ztmin, ztmax) = check_axis(ray.origin.z, ray.direction.z);
+
+        let tmin = xtmin.max(ytmin).max(ztmin);
+        let tmax = xtmax.min(ytmax).min(ztmax);
+
+        if tmin > tmax {
+            return Vec::new();
         }
-        ShapeForm::Cube => {
-            // How to avoid always doing all of these computations?
-            let (xtmin, xtmax) = check_axis(ray.origin.x, ray.direction.x);
-            let (ytmin, ytmax) = check_axis(ray.origin.y, ray.direction.y);
-            let (ztmin, ztmax) = check_axis(ray.origin.z, ray.direction.z);
 
-            let tmin = xtmin.max(ytmin).max(ztmin);
-            let tmax = xtmax.min(ytmax).min(ztmax);
+        vec![Intersection::new(tmin, self), Intersection::new(tmax, self)]
+    }
 
-            if tmin > tmax {
-                return Vec::new();
-            }
+    fn local_normal_at(&self, local_point: Tuple) -> Tuple {
+        let maxc = local_point
+            .x
+            .abs()
+            .max(local_point.y.abs())
+            .max(local_point.z.abs());
 
-            vec![
-                Intersection::new(tmin, shape.clone()),
-                Intersection::new(tmax, shape.clone()),
-            ]
+        if maxc == local_point.x.abs() {
+            v(local_point.x, 0.0, 0.0)
+        } else if maxc == local_point.y.abs() {
+            v(0.0, local_point.y, 0.0)
+        } else {
+            v(0.0, 0.0, local_point.z)
         }
-        ShapeForm::Cylinder(min, max, _closed) => {
-            let a = ray.direction.x.powi(2) + ray.direction.z.powi(2);
+    }
 
-            // ray is parallel to the y axis
-            if equal(a, 0.0) {
-                let mut xs = Vec::new();
-                intersect_caps(shape, ray, &mut xs);
-                return xs;
-            }
+    fn common(&self) -> &Props {
+        &self.props
+    }
 
-            let b = 2.0 * ray.origin.x * ray.direction.x + 2.0 * ray.origin.z * ray.direction.z;
-            let c = ray.origin.x.powi(2) + ray.origin.z.powi(2) - 1.0;
+    fn common_mut(&mut self) -> &mut Props {
+        &mut self.props
+    }
 
-            let disc = b.powi(2) - 4.0 * a * c;
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 
-            // ray does not intersect the cylinder
-            if disc < 0.0 {
-                return Vec::new();
-            }
+    fn shape_eq(&self, other: &dyn Any) -> bool {
+        match other.downcast_ref::<Self>() {
+            Some(_) => true,
+            None => false,
+        }
+    }
+}
 
-            let mut t0 = (-b - disc.sqrt()) / (2.0 * a);
-            let mut t1 = (-b + disc.sqrt()) / (2.0 * a);
-            if t0 > t1 {
-                std::mem::swap(&mut t0, &mut t1);
-            }
+impl Shape for Cylinder {
+    fn local_intersect(&'_ self, ray: &Ray) -> Vec<Intersection<'_>> {
+        let a = ray.direction.x.powi(2) + ray.direction.z.powi(2);
 
+        // ray is parallel to the y axis
+        if equal(a, 0.0) {
             let mut xs = Vec::new();
-
-            let y0 = ray.origin.y + t0 * ray.direction.y;
-            if min < &y0 && &y0 < max {
-                xs.push(Intersection::new(t0, shape.clone()));
-            }
-
-            let y1 = ray.origin.y + t1 * ray.direction.y;
-            if min < &y1 && &y1 < max {
-                xs.push(Intersection::new(t1, shape.clone()));
-            }
-            intersect_caps(shape, ray, &mut xs);
-            xs
+            intersect_caps(self, ray, &mut xs);
+            return xs;
         }
-        ShapeForm::Group(children) => {
-            let mut xs: Vec<Intersection> =
-                children.iter().flat_map(|c| intersect(&c, &ray)).collect();
-            xs.sort_by(|a, b| a.t.partial_cmp(&b.t).unwrap());
-            xs
+
+        let b = 2.0 * ray.origin.x * ray.direction.x + 2.0 * ray.origin.z * ray.direction.z;
+        let c = ray.origin.x.powi(2) + ray.origin.z.powi(2) - 1.0;
+
+        let disc = b.powi(2) - 4.0 * a * c;
+
+        // ray does not intersect the cylinder
+        if disc < 0.0 {
+            return Vec::new();
         }
-        ShapeForm::Triangle { p1, p2, p3 } => Vec::new(),
+
+        let mut t0 = (-b - disc.sqrt()) / (2.0 * a);
+        let mut t1 = (-b + disc.sqrt()) / (2.0 * a);
+        if t0 > t1 {
+            std::mem::swap(&mut t0, &mut t1);
+        }
+
+        let mut xs = Vec::new();
+
+        let y0 = ray.origin.y + t0 * ray.direction.y;
+        if self.min < y0 && y0 < self.max {
+            xs.push(Intersection::new(t0, self));
+        }
+
+        let y1 = ray.origin.y + t1 * ray.direction.y;
+        if self.min < y1 && y1 < self.max {
+            xs.push(Intersection::new(t1, self));
+        }
+        intersect_caps(&self, ray, &mut xs);
+        xs
+    }
+
+    fn local_normal_at(&self, local_point: Tuple) -> Tuple {
+        // compute the square of the distance from the y axis
+        let dist = local_point.x.powi(2) + local_point.z.powi(2);
+
+        if dist < 1.0 && local_point.y >= self.max - EPSILON {
+            return v(0.0, 1.0, 0.0);
+        } else if dist < 1.0 && local_point.y <= self.min + EPSILON {
+            return v(0.0, -1.0, 0.0);
+        }
+        v(local_point.x, 0.0, local_point.z)
+    }
+
+    fn common(&self) -> &Props {
+        &self.props
+    }
+
+    fn common_mut(&mut self) -> &mut Props {
+        &mut self.props
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn shape_eq(&self, other: &dyn Any) -> bool {
+        match other.downcast_ref::<Self>() {
+            Some(_) => true,
+            None => false,
+        }
     }
 }
 
-impl Shape {
-    pub fn local_normal_at(&self, local_point: Tuple) -> Tuple {
-        match self.form {
-            ShapeForm::Test => v(local_point.x, local_point.y, local_point.z),
-            ShapeForm::Sphere => local_point - pt(0.0, 0.0, 0.0),
-            ShapeForm::Plane => v(0.0, 1.0, 0.0),
-            ShapeForm::Cube => {
-                let maxc = local_point
-                    .x
-                    .abs()
-                    .max(local_point.y.abs())
-                    .max(local_point.z.abs());
+// impl<'a> Shape for Group<'a> {
+//     fn local_intersect(&'_ self, ray: &Ray) -> Vec<Intersection<'_>> {
+//         let mut xs: Vec<Intersection> = self
+//             .children
+//             .iter()
+//             .flat_map(|c| c.intersect(&ray))
+//             .collect();
+//         xs.sort_by(|a, b| a.t.partial_cmp(&b.t).unwrap());
+//         xs
+//     }
 
-                if maxc == local_point.x.abs() {
-                    v(local_point.x, 0.0, 0.0)
-                } else if maxc == local_point.y.abs() {
-                    v(0.0, local_point.y, 0.0)
-                } else {
-                    v(0.0, 0.0, local_point.z)
-                }
-            }
-            ShapeForm::Cylinder(min, max, _closed) => {
-                // compute the square of the distance from the y axis
-                let dist = local_point.x.powi(2) + local_point.z.powi(2);
+//     fn local_normal_at(&self, _local_point: Tuple) -> Tuple {
+//         unreachable!()
+//     }
 
-                if dist < 1.0 && local_point.y >= max - EPSILON {
-                    return v(0.0, 1.0, 0.0);
-                } else if dist < 1.0 && local_point.y <= min + EPSILON {
-                    return v(0.0, -1.0, 0.0);
-                }
-                v(local_point.x, 0.0, local_point.z)
-            }
-            ShapeForm::Group(..) => unreachable!(),
-            ShapeForm::Triangle { .. } => unreachable!(),
+//     fn common(&self) -> &Props {
+//         &self.props
+//     }
+
+//     fn common_mut(&mut self) -> &mut Props {
+//         &mut self.props
+//     }
+// }
+
+impl Shape for Triangle {
+    fn local_intersect(&'_ self, _ray: &Ray) -> Vec<Intersection<'_>> {
+        Vec::new()
+    }
+
+    fn local_normal_at(&self, _local_point: Tuple) -> Tuple {
+        unreachable!()
+    }
+
+    fn common(&self) -> &Props {
+        &self.props
+    }
+
+    fn common_mut(&mut self) -> &mut Props {
+        &mut self.props
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn shape_eq(&self, other: &dyn Any) -> bool {
+        match other.downcast_ref::<Self>() {
+            Some(_) => true,
+            None => false,
         }
     }
 }
 
-pub fn normal_at(shape: &Rc<RefCell<Shape>>, world_point: Tuple) -> Tuple {
-    let object_point = world_to_object(&shape, world_point);
-    let object_normal = shape.borrow().local_normal_at(object_point);
-    normal_to_world(&shape, object_normal)
-}
-
-pub fn world_to_object(shape: &Rc<RefCell<Shape>>, point: Tuple) -> Tuple {
-    let mut point = point;
-    let shape = shape.borrow();
-    if let Some(parent) = &shape.parent {
-        point = world_to_object(&parent, point);
+impl<'a> From<Triangle> for Box<dyn Shape + 'a> {
+    fn from(value: Triangle) -> Box<dyn Shape + 'a> {
+        Box::new(value)
     }
-    shape.transform.inverse().unwrap() * point
 }
 
-pub fn normal_to_world(shape: &Rc<RefCell<Shape>>, normal: Tuple) -> Tuple {
-    let shape = shape.borrow();
-    let mut normal = shape.transform.inverse().unwrap().transpose() * normal;
+impl<'a> From<Sphere> for Box<dyn Shape + 'a> {
+    fn from(value: Sphere) -> Box<dyn Shape + 'a> {
+        Box::new(value)
+    }
+}
+
+impl<'a> From<Cube> for Box<dyn Shape + 'a> {
+    fn from(value: Cube) -> Box<dyn Shape + 'a> {
+        Box::new(value)
+    }
+}
+
+impl<'a> From<Plane> for Box<dyn Shape + 'a> {
+    fn from(value: Plane) -> Box<dyn Shape + 'a> {
+        Box::new(value)
+    }
+}
+
+pub fn normal_at(shape: &dyn Shape, world_point: Tuple) -> Tuple {
+    let object_point = world_to_object(shape, world_point);
+    let object_normal = shape.local_normal_at(object_point);
+    normal_to_world(shape, object_normal)
+}
+
+pub fn world_to_object(shape: &dyn Shape, point: Tuple) -> Tuple {
+    let point = point;
+    let shape = shape;
+    // if let Some(parent) = &shape.parent {
+    //     point = world_to_object(&parent, point);
+    // }
+    shape.transform().inverse().unwrap() * point
+}
+
+pub fn normal_to_world(shape: &dyn Shape, normal: Tuple) -> Tuple {
+    let shape = shape;
+    let mut normal = shape.transform().inverse().unwrap().transpose() * normal;
     normal.w = 0.0;
     normal = normal.normalize();
 
-    if let Some(parent) = &shape.parent {
-        normal = normal_to_world(&parent, normal);
-    }
+    // if let Some(parent) = &shape.parent {
+    //     normal = normal_to_world(&parent, normal);
+    // }
 
     normal
 }
@@ -466,39 +697,39 @@ mod tests {
     #[test]
     fn shape_operations() {
         // the default transformation
-        let s = test_shape();
-        assert_eq!(s.borrow_mut().transform, Matrix4x4::identity());
+        let mut s = test_shape();
+        assert_eq!(s.transform(), &Matrix4x4::identity());
 
         // assigning a transformation
         let t = Matrix4x4::translation(2.0, 3.0, 4.0);
-        s.borrow_mut().transform = t;
-        assert_eq!(s.borrow_mut().transform, t);
+        s.set_transform(t);
+        assert_eq!(s.transform(), &t);
 
         // the default material
-        assert_eq!(s.borrow_mut().material, Material::new());
+        assert_eq!(s.material(), &Material::new());
 
         // assigning a material
         let mut m = Material::new();
         m.ambient = 1.0;
-        s.borrow_mut().material = m;
-        assert_eq!(s.borrow_mut().material, m);
+        s.set_material(m);
+        assert_eq!(s.material(), &m);
 
         // intersecting a scaled shape with a ray
         let r = Ray::new(pt(0.0, 0.0, -5.0), v(0.0, 0.0, 1.0));
-        let s = test_shape();
-        s.borrow_mut().transform = Matrix4x4::scaling(2.0, 2.0, 2.0);
+        let mut s = test_shape();
+        s.set_transform(Matrix4x4::scaling(2.0, 2.0, 2.0));
         unsafe {
             SAVED_RAY = None;
-            intersect(&s, &r);
+            s.intersect(&r);
             assert_eq!(SAVED_RAY.unwrap().origin, pt(0.0, 0.0, -2.5));
             assert_eq!(SAVED_RAY.unwrap().direction, v(0.0, 0.0, 0.5));
         };
 
         // intersecting a translated shape with a ray
-        s.borrow_mut().transform = Matrix4x4::translation(5.0, 0.0, 0.0);
+        s.set_transform(Matrix4x4::translation(5.0, 0.0, 0.0));
         unsafe {
             SAVED_RAY = None;
-            intersect(&s, &r);
+            s.intersect(&r);
             assert_eq!(SAVED_RAY.unwrap().origin, pt(-5.0, 0.0, -5.0));
             assert_eq!(SAVED_RAY.unwrap().direction, v(0.0, 0.0, 1.0));
         };
@@ -508,57 +739,63 @@ mod tests {
     fn sphere_glass() {
         // a helper for producing a sphere with a glassy material
         let s = glass_sphere();
-        assert_eq!(s.borrow().transform, Matrix4x4::identity());
-        assert_eq!(s.borrow().material.transparency, 1.0);
-        assert_eq!(s.borrow().material.refractive_index, 1.5);
+        assert_eq!(s.transform(), &Matrix4x4::identity());
+        assert_eq!(s.material().transparency, 1.0);
+        assert_eq!(s.material().refractive_index, 1.5);
     }
 
-    #[test]
-    fn group_create() {
-        // creating a new group
-        let g = group();
-        assert_eq!(g.borrow().transform, Matrix4x4::identity());
-        let g = &g.borrow();
-        if let ShapeForm::Group(children) = &g.form {
-            assert_eq!(children.len(), 0);
-        } else {
-            panic!("failed!");
-        }
-    }
+    // #[test]
+    // fn group_create() {
+    //     // creating a new group
+    //     let g = group();
+    //     assert_eq!(g.transform(), &Matrix4x4::identity());
+    //     assert_eq!(g.children.len(), 0);
+    // }
 
-    #[test]
-    fn group_add_children() {
-        // adding a child to a group
-        let mut g = group();
-        let s = test_shape();
-        add_child(&mut g, s.clone());
-        let children = children(&g);
-        assert_eq!(children.len(), 1);
-        assert!(children.iter().any(|e| e == &s));
-        let s = s.borrow();
-        assert!(s.parent.is_some());
-        assert_eq!(s.parent.as_ref().unwrap(), &g);
-    }
+    // #[test]
+    // fn group_add_children() {
+    //     // adding a child to a group
+    //     let mut g = group();
+    //     let s = test_shape();
+    //     add_child(&mut g, Box::new(s));
+    //     let children = children(&g);
+    //     assert_eq!(children.len(), 1);
+    //     // assert!(children.iter().any(|e| e == &s));
+    //     // let s = s;
+    //     // assert!(s.parent.is_some());
+    //     // assert_eq!(s.parent.as_ref().unwrap(), &g);
+    // }
 
     #[test]
     fn shape_parent() {
         // a shape has a parent attribute
         let s = test_shape();
-        assert!(s.borrow().parent == None);
+        // assert!(s.parent == None);
     }
+
+    // #[test]
+    // fn triangle_normal_vector() {
+    //     // finding the normal on a triangle
+    //     let p1 = pt(0.0, 1.0, 0.0);
+    //     let p2 = pt(-1.0, 0.0, 0.0);
+    //     let p3 = pt(1.0, 0.0, 0.0);
+    //     let t = triangle(p1, p2, p3);
+    //     let n1 = t.local_normal_at(pt(0.0, 0.5, 0.0));
+    //     let n2 = t.local_normal_at(pt(-0.5, 0.75, 0.0));
+    //     let n3 = t.local_normal_at(pt(0.5, 0.25, 0.0));
+    // }
 
     #[test]
     fn shape_transformed_normal() {
         // computing the normal on a translated shape
-        let s = test_shape();
-        s.borrow_mut().transform = Matrix4x4::translation(0.0, 1.0, 0.0);
+        let mut s = test_shape();
+        s.set_transform(Matrix4x4::translation(0.0, 1.0, 0.0));
         let n = normal_at(&s, pt(0.0, 1.70711, -0.70711));
         assert_eq!(n, v(0.0, 0.70711, -0.70711));
 
         // computing the normal on a transformed shape
-        let s = test_shape();
-        s.borrow_mut().transform =
-            Matrix4x4::scaling(1.0, 0.5, 1.0) * Matrix4x4::rotation_z(PI / 5.0);
+        let mut s = test_shape();
+        s.set_transform(Matrix4x4::scaling(1.0, 0.5, 1.0) * Matrix4x4::rotation_z(PI / 5.0));
         let n = normal_at(&s, pt(0.0, 2.0_f64 / 2.0, -2.0_f64 / 2.0));
         assert_eq!(n, v(0.0, 0.97014, -0.24254));
     }
@@ -568,35 +805,35 @@ mod tests {
         // a ray intersects a sphere at two points
         let r = Ray::new(pt(0.0, 0.0, -5.0), v(0.0, 0.0, 1.0));
         let s = sphere();
-        let xs = intersect(&s, &r);
+        let xs = s.intersect(&r);
         assert_eq!(xs.len(), 2);
         assert_eq!(xs[0].t, 4.0);
-        assert!(xs[0].object == sphere());
+        assert_eq!(xs[0].object, &sphere() as &dyn Shape);
         assert_eq!(xs[1].t, 6.0);
-        assert!(xs[1].object == sphere());
+        assert_eq!(xs[1].object, &sphere() as &dyn Shape);
 
         // a ray intersects a sphere at a tangent
         let r = Ray::new(pt(0.0, 1.0, -5.0), v(0.0, 0.0, 1.0));
-        let xs = intersect(&s, &r);
+        let xs = s.intersect(&r);
         assert_eq!(xs.len(), 2);
         assert_eq!(xs[0].t, 5.0);
         assert_eq!(xs[1].t, 5.0);
 
         // a ray misses a sphere
         let r = Ray::new(pt(0.0, 2.0, -5.0), v(0.0, 0.0, 1.0));
-        let xs = intersect(&s, &r);
+        let xs = s.intersect(&r);
         assert_eq!(xs.len(), 0);
 
         // a ray originates inside a sphere
         let r = Ray::new(pt(0.0, 0.0, 0.0), v(0.0, 0.0, 1.0));
-        let xs = intersect(&s, &r);
+        let xs = s.intersect(&r);
         assert_eq!(xs.len(), 2);
         assert_eq!(xs[0].t, -1.0);
         assert_eq!(xs[1].t, 1.0);
 
         // a sphere is behind a ray
         let r = Ray::new(pt(0.0, 0.0, 5.0), v(0.0, 0.0, 1.0));
-        let xs = intersect(&s, &r);
+        let xs = s.intersect(&r);
         assert_eq!(xs.len(), 2);
         assert_eq!(xs[0].t, -6.0);
         assert_eq!(xs[1].t, -4.0);
@@ -607,27 +844,27 @@ mod tests {
         // intersect with a ray parallel to the plane
         let p = plane();
         let r = Ray::new(pt(0.0, 10.0, 0.0), v(0.0, 0.0, 1.0));
-        let xs = local_intersect(&p, &r);
+        let xs = p.local_intersect(&r);
         assert_eq!(xs.len(), 0);
 
         // intersect with a coplanar ray
         let r = Ray::new(pt(0.0, 0.0, 0.0), v(0.0, 0.0, 1.0));
-        let xs = local_intersect(&p, &r);
+        let xs = p.local_intersect(&r);
         assert_eq!(xs.len(), 0);
 
         // a ray intersecting a plane from above
         let r = Ray::new(pt(0.0, 1.0, 0.0), v(0.0, -1.0, 0.0));
-        let xs = local_intersect(&p, &r);
+        let xs = p.local_intersect(&r);
         assert_eq!(xs.len(), 1);
         assert_eq!(xs[0].t, 1.0);
-        assert!(xs[0].object == p);
+        assert_eq!(xs[0].object, &p as &dyn Shape);
 
         // a ray intersection a plane from below
         let r = Ray::new(pt(0.0, -1.0, 0.0), v(0.0, 1.0, 0.0));
-        let xs = local_intersect(&p, &r);
+        let xs = p.local_intersect(&r);
         assert_eq!(xs.len(), 1);
         assert_eq!(xs[0].t, 1.0);
-        assert!(xs[0].object == p);
+        assert_eq!(xs[0].object, &p as &dyn Shape);
     }
 
     #[test]
@@ -635,14 +872,14 @@ mod tests {
         // intersecting a scaled sphere with a ray
         let r = Ray::new(pt(0.0, 0.0, -5.0), v(0.0, 0.0, 1.0));
         let s = spheret(Matrix4x4::scaling(2.0, 2.0, 2.0));
-        let xs = intersect(&s, &r);
+        let xs = s.intersect(&r);
         assert_eq!(xs.len(), 2);
         assert_eq!(xs[0].t, 3.0);
         assert_eq!(xs[1].t, 7.0);
 
         // intersecting a translated sphere with a ray
         let s = spheret(Matrix4x4::translation(5.0, 0.0, 0.0));
-        let xs = intersect(&s, &r);
+        let xs = s.intersect(&r);
         assert_eq!(xs.len(), 0);
     }
 
@@ -652,7 +889,7 @@ mod tests {
         fn test(origin: Tuple, direction: Tuple, t1: f64, t2: f64) {
             let c = cube();
             let r = Ray::new(origin, direction);
-            let xs = local_intersect(&c, &r);
+            let xs = c.local_intersect(&r);
             assert_eq!(xs.len(), 2);
             assert_eq!(xs[0].t, t1);
             assert_eq!(xs[1].t, t2);
@@ -675,7 +912,7 @@ mod tests {
         fn test_miss(origin: Tuple, direction: Tuple) {
             let c = cube();
             let r = Ray::new(origin, direction);
-            let xs = local_intersect(&c, &r);
+            let xs = c.local_intersect(&r);
             assert_eq!(xs.len(), 0);
         }
         test_miss(pt(-2.0, 0.0, 0.0), v(0.2673, 0.5345, 0.8018));
@@ -693,7 +930,7 @@ mod tests {
             let cyl = cylinder(std::f64::NEG_INFINITY, std::f64::INFINITY, false);
             let direction = direction.normalize();
             let r = Ray::new(origin, direction);
-            let xs = local_intersect(&cyl, &r);
+            let xs = cyl.local_intersect(&r);
             assert_eq!(xs.len(), 0, "{}", scenario);
         }
         test("one", pt(1.0, 0.0, 0.0), v(0.0, 1.0, 0.0));
@@ -708,7 +945,7 @@ mod tests {
             let cyl = cylinder(std::f64::NEG_INFINITY, std::f64::INFINITY, false);
             let direction = direction.normalize();
             let r = Ray::new(origin, direction);
-            let xs = local_intersect(&cyl, &r);
+            let xs = cyl.local_intersect(&r);
             assert_eq!(xs.len(), 2, "{}", scenario);
             assert_eq!(equal(xs[0].t, t0), true, "{}", scenario);
             assert_eq!(equal(xs[1].t, t1), true, "{}", scenario);
@@ -731,7 +968,7 @@ mod tests {
             let cyl = cylinder(1.0, 2.0, false);
             let direction = direction.normalize();
             let r = Ray::new(origin, direction);
-            let xs = local_intersect(&cyl, &r);
+            let xs = cyl.local_intersect(&r);
             assert_eq!(xs.len(), count, "{}", scenario);
         }
 
@@ -750,7 +987,7 @@ mod tests {
             let cyl = cylinder(1.0, 2.0, true);
             let direction = direction.normalize();
             let r = Ray::new(origin, direction);
-            let xs = intersect(&cyl, &r);
+            let xs = cyl.intersect(&r);
             assert_eq!(xs.len(), count, "{}", scenario);
         }
 
@@ -763,46 +1000,46 @@ mod tests {
         test("5", pt(0.0, -1.0, -2.0), v(0.0, 1.0, 1.0), 2);
     }
 
-    #[test]
-    fn ray_intersection_with_empty_group() {
-        // intersecting a ray with an empty group
-        let g = group();
-        let r = Ray::new(pt(0.0, 0.0, 0.0), v(0.0, 0.0, 1.0));
-        let xs = local_intersect(&g, &r);
-        assert_eq!(xs.len(), 0);
-    }
+    // #[test]
+    // fn ray_intersection_with_empty_group() {
+    //     // intersecting a ray with an empty group
+    //     let g = group();
+    //     let r = Ray::new(pt(0.0, 0.0, 0.0), v(0.0, 0.0, 1.0));
+    //     let xs = g.local_intersect(&r);
+    //     assert_eq!(xs.len(), 0);
+    // }
 
     #[test]
     fn ray_intersection_with_non_empty_group() {
         // intersecting a ray with a non-empty group
-        let mut g = group();
-        let s1 = sphere();
-        let s2 = spheret(Matrix4x4::translation(0.0, 0.0, -3.0));
-        let s3 = spheret(Matrix4x4::translation(5.0, 0.0, 0.0));
-        add_child(&mut g, s1.clone());
-        add_child(&mut g, s2.clone());
-        add_child(&mut g, s3.clone());
-        let r = Ray::new(pt(0.0, 0.0, -5.0), v(0.0, 0.0, 1.0));
-        let xs = local_intersect(&g, &r);
-        assert_eq!(children(&g).len(), 3);
-        assert_eq!(xs.len(), 4);
-        assert_eq!(xs[0].object, s2);
-        assert_eq!(xs[1].object, s2);
-        assert_eq!(xs[2].object, s1);
-        assert_eq!(xs[3].object, s1);
+        // let g = group();
+        // let s1: Box<dyn Shape> = sphere().into();
+        // let s2: Box<dyn Shape> = spheret(Matrix4x4::translation(0.0, 0.0, -3.0)).into();
+        // let s3: Box<dyn Shape> = spheret(Matrix4x4::translation(5.0, 0.0, 0.0)).into();
+        // add_child(&mut g, s1.clone());
+        // add_child(&mut g, s2.clone());
+        // add_child(&mut g, s3.clone());
+        // let r = Ray::new(pt(0.0, 0.0, -5.0), v(0.0, 0.0, 1.0));
+        // let xs = g.local_intersect(&r);
+        // assert_eq!(children(&g).len(), 3);
+        // assert_eq!(xs.len(), 4);
+        // assert_eq!(xs[0].object, &*s2);
+        // assert_eq!(xs[1].object, &*s2);
+        // assert_eq!(xs[2].object, &*s1);
+        // assert_eq!(xs[3].object, &*s1);
     }
 
-    #[test]
-    fn ray_intersection_with_transformed_group() {
-        // intersecting a transformed group
-        let g = group();
-        g.borrow_mut().transform = Matrix4x4::scaling(2.0, 2.0, 2.0);
-        let s = spheret(Matrix4x4::translation(5.0, 0.0, 0.0));
-        add_child(&g, s.clone());
-        let r = Ray::new(pt(10.0, 0.0, -10.0), v(0.0, 0.0, 1.0));
-        let xs = intersect(&g, &r);
-        assert_eq!(xs.len(), 2);
-    }
+    // #[test]
+    // fn ray_intersection_with_transformed_group() {
+    //     // intersecting a transformed group
+    //     let mut g = group();
+    //     g.set_transform(Matrix4x4::scaling(2.0, 2.0, 2.0));
+    //     // let s = spheret(Matrix4x4::translation(5.0, 0.0, 0.0));
+    //     // add_child(&g, s.clone());
+    //     let r = Ray::new(pt(10.0, 0.0, -10.0), v(0.0, 0.0, 1.0));
+    //     let xs = g.intersect(&r);
+    //     assert_eq!(xs.len(), 2);
+    // }
 
     #[test]
     fn sphere_normal_at() {
@@ -878,7 +1115,7 @@ mod tests {
         // normal vector on a cylinder
         fn test(point: Tuple, normal: Tuple) {
             let cyl = cylinder(std::f64::NEG_INFINITY, std::f64::INFINITY, false);
-            let n = cyl.borrow().local_normal_at(point);
+            let n = cyl.local_normal_at(point);
             assert_eq!(n, normal);
         }
         test(pt(1.0, 0.0, 0.0), v(1.0, 0.0, 0.0));
@@ -892,7 +1129,7 @@ mod tests {
         // the normal vector on a cylinder's end caps
         fn test(point: Tuple, normal: Tuple) {
             let cyl = cylinder(1.0, 2.0, true);
-            let n = cyl.borrow().local_normal_at(point);
+            let n = cyl.local_normal_at(point);
             assert_eq!(n, normal);
         }
 
@@ -904,52 +1141,52 @@ mod tests {
         test(pt(0.0, 2.0, 0.5), v(0.0, 1.0, 0.0));
     }
 
-    #[test]
-    fn world_to_object_space() {
-        // converting a point from world to object space
-        let g1 = group();
-        g1.borrow_mut().transform = Matrix4x4::rotation_y(PI / 2.0);
-        let g2 = group();
-        g2.borrow_mut().transform = Matrix4x4::scaling(2.0, 2.0, 2.0);
-        let s = spheret(Matrix4x4::translation(5.0, 0.0, 0.0));
-        add_child(&g2, s.clone());
-        add_child(&g1, g2);
-        let p = world_to_object(&s, pt(-2.0, 0.0, -10.0));
-        assert_eq!(p, pt(0.0, 0.0, -1.0));
-    }
+    // #[test]
+    // fn world_to_object_space() {
+    //     // converting a point from world to object space
+    //     let mut g1 = group();
+    //     g1.set_transform(Matrix4x4::rotation_y(PI / 2.0));
+    //     let mut g2 = group();
+    //     g2.set_transform(Matrix4x4::scaling(2.0, 2.0, 2.0));
+    //     let s = spheret(Matrix4x4::translation(5.0, 0.0, 0.0));
+    //     // add_child(&g2, s.clone());
+    //     // add_child(&g1, g2);
+    //     let p = world_to_object(&s, pt(-2.0, 0.0, -10.0));
+    //     assert_eq!(p, pt(0.0, 0.0, -1.0));
+    // }
 
-    #[test]
-    fn normal_from_object_to_world_space() {
-        // converting a normal from object to world space
-        let g1 = group();
-        g1.borrow_mut().transform = Matrix4x4::rotation_y(PI / 2.0);
-        let g2 = group();
-        g2.borrow_mut().transform = Matrix4x4::scaling(1.0, 2.0, 3.0);
-        let s = spheret(Matrix4x4::translation(5.0, 0.0, 0.0));
-        add_child(&g2, s.clone());
-        add_child(&g1, g2);
-        let n = normal_to_world(
-            &s,
-            v(
-                3.0_f64.sqrt() / 3.0,
-                3.0_f64.sqrt() / 3.0,
-                3.0_f64.sqrt() / 3.0,
-            ),
-        );
-        assert_eq!(n, v(0.28571, 0.42857, -0.85714));
-    }
+    // #[test]
+    // fn normal_from_object_to_world_space() {
+    //     // converting a normal from object to world space
+    //     let mut g1 = group();
+    //     g1.set_transform(Matrix4x4::rotation_y(PI / 2.0));
+    //     let mut g2 = group();
+    //     g2.set_transform(Matrix4x4::scaling(1.0, 2.0, 3.0));
+    //     let s = spheret(Matrix4x4::translation(5.0, 0.0, 0.0));
+    //     // add_child(&g2, s.clone());
+    //     // add_child(&g1, g2);
+    //     let n = normal_to_world(
+    //         &s,
+    //         v(
+    //             3.0_f64.sqrt() / 3.0,
+    //             3.0_f64.sqrt() / 3.0,
+    //             3.0_f64.sqrt() / 3.0,
+    //         ),
+    //     );
+    //     assert_eq!(n, v(0.28571, 0.42857, -0.85714));
+    // }
 
-    #[test]
-    fn normal_on_child_object() {
-        // finding the normal on a child object
-        let g1 = group();
-        g1.borrow_mut().transform = Matrix4x4::rotation_y(PI / 2.0);
-        let g2 = group();
-        g2.borrow_mut().transform = Matrix4x4::scaling(1.0, 2.0, 3.0);
-        let s = spheret(Matrix4x4::translation(5.0, 0.0, 0.0));
-        add_child(&g2, s.clone());
-        add_child(&g1, g2);
-        let n = normal_at(&s, pt(1.7321, 1.1547, -5.5774));
-        assert_eq!(n, v(0.2857, 0.42854, -0.85716));
-    }
+    // #[test]
+    // fn normal_on_child_object() {
+    //     // finding the normal on a child object
+    //     let mut g1 = group();
+    //     g1.set_transform(Matrix4x4::rotation_y(PI / 2.0));
+    //     let mut g2 = group();
+    //     g2.set_transform(Matrix4x4::scaling(1.0, 2.0, 3.0));
+    //     let s = spheret(Matrix4x4::translation(5.0, 0.0, 0.0));
+    //     // add_child(&g2, s.clone());
+    //     // add_child(&g1, g2);
+    //     let n = normal_at(&s, pt(1.7321, 1.1547, -5.5774));
+    //     assert_eq!(n, v(0.2857, 0.42854, -0.85716));
+    // }
 }
