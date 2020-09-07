@@ -74,6 +74,6 @@ fn main() -> Result<(), std::io::Error> {
     let mut camera = Camera::new(400, 200, PI / 3.0);
     camera.transform = view_transform(pt(0.0, 1.5, -5.0), pt(0.0, 1.0, 0.0), v(0.0, 1.0, 0.0));
 
-    let canvas = camera.render(&world);
+    let canvas = camera.render(&mut world);
     std::fs::write("./first_scene.ppm", canvas.to_ppm())
 }

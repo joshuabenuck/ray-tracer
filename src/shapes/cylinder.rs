@@ -139,6 +139,10 @@ impl Shape for Cylinder {
         self
     }
 
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+
     fn shape_eq(&self, other: &dyn Any) -> bool {
         match other.downcast_ref::<Self>() {
             Some(_) => true,

@@ -2,11 +2,10 @@ use crate::{Intersection, Material, Matrix4x4, Ray, Tuple};
 use std::any::Any;
 use std::fmt::Debug;
 
-#[derive(Clone)]
 pub struct Props {
     pub transform: Matrix4x4,
     pub material: Material,
-    // pub parent: Option<Box<dyn Shape>>,
+    pub parent_transforms: Vec<Matrix4x4>,
 }
 
 impl Default for Props {
@@ -14,7 +13,7 @@ impl Default for Props {
         Props {
             transform: Matrix4x4::identity(),
             material: Material::new(),
-            // parent: None,
+            parent_transforms: Vec::new(),
         }
     }
 }
@@ -31,13 +30,9 @@ impl Debug for Props {
     }
 }
 
-// pub struct Group<'a> {
-//     props: Props,
-//     children: Vec<Box<dyn Shape + 'a>>,
-// }
-
 pub trait Shape {
     fn as_any(&self) -> &dyn Any;
+    fn as_any_mut(&mut self) -> &mut dyn Any;
     fn shape_eq(&self, other: &dyn Any) -> bool;
     fn intersect(&'_ self, ray: &Ray) -> Vec<Intersection<'_>> {
         let ray = ray.transform(self.transform().inverse().unwrap());
@@ -50,22 +45,24 @@ pub trait Shape {
         self.normal_to_world(object_normal)
     }
     fn world_to_object(&self, point: Tuple) -> Tuple {
-        let point = point;
-        let shape = self;
-        // if let Some(parent) = &shape.parent {
-        //     point = world_to_object(&parent, point);
-        // }
-        shape.transform().inverse().unwrap() * point
+        let mut point = point;
+        for transform in self.parent_transforms() {
+            point = transform.inverse().unwrap() * point;
+        }
+        self.transform().inverse().unwrap() * point
     }
     fn normal_to_world(&self, normal: Tuple) -> Tuple {
         let shape = self;
-        let mut normal = shape.transform().inverse().unwrap().transpose() * normal;
-        normal.w = 0.0;
-        normal = normal.normalize();
-
-        // if let Some(parent) = &shape.parent {
-        //     normal = normal_to_world(&parent, normal);
-        // }
+        fn compute_normal(transform: &Matrix4x4, normal: Tuple) -> Tuple {
+            let mut normal = transform.inverse().unwrap().transpose() * normal;
+            normal.w = 0.0;
+            normal = normal.normalize();
+            normal
+        }
+        let mut normal = compute_normal(shape.transform(), normal);
+        for transform in self.parent_transforms().iter().rev() {
+            normal = compute_normal(transform, normal);
+        }
 
         normal
     }
@@ -90,6 +87,13 @@ pub trait Shape {
     fn set_material(&mut self, material: Material) {
         self.common_mut().material = material;
     }
+    fn parent_transforms(&self) -> &Vec<Matrix4x4> {
+        &self.common().parent_transforms
+    }
+    fn set_parent_transforms(&mut self, parent_transforms: Vec<Matrix4x4>) {
+        self.common_mut().parent_transforms = parent_transforms;
+    }
+    fn refresh_parents(&mut self) {}
 }
 
 impl Debug for dyn Shape + '_ {
@@ -108,55 +112,6 @@ impl PartialEq for dyn Shape + '_ {
         self.common() == other.common() && self.shape_eq(other.as_any())
     }
 }
-
-// impl PartialEq for Shape {
-//     fn eq(&self, other: &Self) -> bool {
-//         self.transform == other.transform
-//             && self.material == other.material
-//             && self.form == other.form
-//     }
-// }
-
-// #[inline]
-// pub fn group<'a>() -> Group<'a> {
-//     Group {
-//         props: Props::default(),
-//         children: Vec::new(),
-//     }
-// }
-
-// pub fn add_child<'a>(group: &'a mut Group, child: Box<dyn Shape + 'a>) {
-//     // child.parent = Some(group.clone());
-//     // group.children.push(child);
-// }
-
-// pub fn children<'a>(group: &'a Group) -> &'a Vec<Box<dyn Shape + 'a>> {
-//     &group.children
-// }
-
-// impl<'a> Shape for Group<'a> {
-//     fn local_intersect(&'_ self, ray: &Ray) -> Vec<Intersection<'_>> {
-//         let mut xs: Vec<Intersection> = self
-//             .children
-//             .iter()
-//             .flat_map(|c| c.intersect(&ray))
-//             .collect();
-//         xs.sort_by(|a, b| a.t.partial_cmp(&b.t).unwrap());
-//         xs
-//     }
-
-//     fn local_normal_at(&self, _local_point: Tuple) -> Tuple {
-//         unreachable!()
-//     }
-
-//     fn common(&self) -> &Props {
-//         &self.props
-//     }
-
-//     fn common_mut(&mut self) -> &mut Props {
-//         &mut self.props
-//     }
-// }
 
 #[cfg(test)]
 mod tests {
@@ -200,6 +155,10 @@ mod tests {
         }
 
         fn as_any(&self) -> &dyn Any {
+            self
+        }
+
+        fn as_any_mut(&mut self) -> &mut dyn Any {
             self
         }
 
@@ -252,33 +211,11 @@ mod tests {
         };
     }
 
-    // #[test]
-    // fn group_create() {
-    //     // creating a new group
-    //     let g = group();
-    //     assert_eq!(g.transform(), &Matrix4x4::identity());
-    //     assert_eq!(g.children.len(), 0);
-    // }
-
-    // #[test]
-    // fn group_add_children() {
-    //     // adding a child to a group
-    //     let mut g = group();
-    //     let s = test_shape();
-    //     add_child(&mut g, Box::new(s));
-    //     let children = children(&g);
-    //     assert_eq!(children.len(), 1);
-    //     // assert!(children.iter().any(|e| e == &s));
-    //     // let s = s;
-    //     // assert!(s.parent.is_some());
-    //     // assert_eq!(s.parent.as_ref().unwrap(), &g);
-    // }
-
     #[test]
     fn shape_parent() {
         // a shape has a parent attribute
         let s = TestShape::new();
-        // assert!(s.parent == None);
+        assert!(s.parent_transforms().len() == 0);
     }
 
     #[test]
@@ -295,94 +232,4 @@ mod tests {
         let n = s.normal_at(pt(0.0, 2.0_f64 / 2.0, -2.0_f64 / 2.0));
         assert_eq!(n, v(0.0, 0.97014, -0.24254));
     }
-
-    // #[test]
-    // fn ray_intersection_with_empty_group() {
-    //     // intersecting a ray with an empty group
-    //     let g = group();
-    //     let r = Ray::new(pt(0.0, 0.0, 0.0), v(0.0, 0.0, 1.0));
-    //     let xs = g.local_intersect(&r);
-    //     assert_eq!(xs.len(), 0);
-    // }
-
-    #[test]
-    fn ray_intersection_with_non_empty_group() {
-        // intersecting a ray with a non-empty group
-        // let g = group();
-        // let s1: Box<dyn Shape> = Sphere::new().into();
-        // let s2: Box<dyn Shape> = Sphere::new().transform(Matrix4x4::translation(0.0, 0.0, -3.0)).into();
-        // let s3: Box<dyn Shape> = Sphere::new().transform(Matrix4x4::translation(5.0, 0.0, 0.0)).into();
-        // add_child(&mut g, s1.clone());
-        // add_child(&mut g, s2.clone());
-        // add_child(&mut g, s3.clone());
-        // let r = Ray::new(pt(0.0, 0.0, -5.0), v(0.0, 0.0, 1.0));
-        // let xs = g.local_intersect(&r);
-        // assert_eq!(children(&g).len(), 3);
-        // assert_eq!(xs.len(), 4);
-        // assert_eq!(xs[0].object, &*s2);
-        // assert_eq!(xs[1].object, &*s2);
-        // assert_eq!(xs[2].object, &*s1);
-        // assert_eq!(xs[3].object, &*s1);
-    }
-
-    // #[test]
-    // fn ray_intersection_with_transformed_group() {
-    //     // intersecting a transformed group
-    //     let mut g = group();
-    //     g.set_transform(Matrix4x4::scaling(2.0, 2.0, 2.0));
-    //     // let s = Sphere::new().transform(Matrix4x4::translation(5.0, 0.0, 0.0));
-    //     // add_child(&g, s.clone());
-    //     let r = Ray::new(pt(10.0, 0.0, -10.0), v(0.0, 0.0, 1.0));
-    //     let xs = g.intersect(&r);
-    //     assert_eq!(xs.len(), 2);
-    // }
-
-    // #[test]
-    // fn world_to_object_space() {
-    //     // converting a point from world to object space
-    //     let mut g1 = group();
-    //     g1.set_transform(Matrix4x4::rotation_y(PI / 2.0));
-    //     let mut g2 = group();
-    //     g2.set_transform(Matrix4x4::scaling(2.0, 2.0, 2.0));
-    //     let s = Sphere::new().transform(Matrix4x4::translation(5.0, 0.0, 0.0));
-    //     // add_child(&g2, s.clone());
-    //     // add_child(&g1, g2);
-    //     let p = world_to_object(&s, pt(-2.0, 0.0, -10.0));
-    //     assert_eq!(p, pt(0.0, 0.0, -1.0));
-    // }
-
-    // #[test]
-    // fn normal_from_object_to_world_space() {
-    //     // converting a normal from object to world space
-    //     let mut g1 = group();
-    //     g1.set_transform(Matrix4x4::rotation_y(PI / 2.0));
-    //     let mut g2 = group();
-    //     g2.set_transform(Matrix4x4::scaling(1.0, 2.0, 3.0));
-    //     let s = Sphere::new().transform(Matrix4x4::translation(5.0, 0.0, 0.0));
-    //     // add_child(&g2, s.clone());
-    //     // add_child(&g1, g2);
-    //     let n = normal_to_world(
-    //         &s,
-    //         v(
-    //             3.0_f64.sqrt() / 3.0,
-    //             3.0_f64.sqrt() / 3.0,
-    //             3.0_f64.sqrt() / 3.0,
-    //         ),
-    //     );
-    //     assert_eq!(n, v(0.28571, 0.42857, -0.85714));
-    // }
-
-    // #[test]
-    // fn normal_on_child_object() {
-    //     // finding the normal on a child object
-    //     let mut g1 = group();
-    //     g1.set_transform(Matrix4x4::rotation_y(PI / 2.0));
-    //     let mut g2 = group();
-    //     g2.set_transform(Matrix4x4::scaling(1.0, 2.0, 3.0));
-    //     let s = Sphere::new().transform(Matrix4x4::translation(5.0, 0.0, 0.0));
-    //     // add_child(&g2, s.clone());
-    //     // add_child(&g1, g2);
-    //     let n = normal_at(&s, pt(1.7321, 1.1547, -5.5774));
-    //     assert_eq!(n, v(0.2857, 0.42854, -0.85716));
-    // }
 }

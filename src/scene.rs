@@ -128,6 +128,12 @@ impl<'a> World {
         // by the transparency value to account for any opacity
         self.color_at(&refract_ray, remaining - 1) * comps.object.material().transparency
     }
+
+    pub fn refresh_parents(&mut self) {
+        for object in self.objects.iter_mut() {
+            object.refresh_parents();
+        }
+    }
 }
 
 impl Default for World {
@@ -223,7 +229,8 @@ impl Camera {
         Ray::new(origin, direction)
     }
 
-    pub fn render(&self, world: &World) -> Canvas {
+    pub fn render(&self, world: &mut World) -> Canvas {
+        world.refresh_parents();
         let mut image = Canvas::new(self.hsize, self.vsize);
 
         for y in 0..self.vsize {
@@ -446,13 +453,13 @@ mod tests {
     #[test]
     fn camera_render() {
         // rendering a world with a camera
-        let w = World::default();
+        let mut w = World::default();
         let mut c = Camera::new(11, 11, PI / 2.0);
         let from = pt(0.0, 0.0, -5.0);
         let to = pt(0.0, 0.0, 0.0);
         let up = v(0.0, 1.0, 0.0);
         c.transform = view_transform(from, to, up);
-        let image = c.render(&w);
+        let image = c.render(&mut w);
         assert_eq!(image.pixel_at(5, 5), Color::new(0.38066, 0.47583, 0.2855));
     }
 
@@ -487,9 +494,10 @@ mod tests {
         let s1 = Sphere::new();
         let transform = Matrix4x4::translation(0.0, 0.0, 10.0);
         let s2 = Sphere::new().transform(transform);
-        w.objects.append(&mut vec![s1.into(), s2.clone().into()]);
+        w.objects.append(&mut vec![s1.into(), s2.into()]);
         let r = Ray::new(pt(0.0, 0.0, 5.0), v(0.0, 0.0, 1.0));
-        let i = Intersection::new(4.0, &s2);
+        // s2 = w.objects[1]
+        let i = Intersection::new(4.0, &*w.objects[1]);
         let comps = i.prepare_computations(&r, &vec![i.clone()]);
         let c = w.shade_hit(&comps, 1);
         assert_eq!(c, Color::new(0.1, 0.1, 0.1));

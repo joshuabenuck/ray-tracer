@@ -1,7 +1,7 @@
 use crate::{pt, Intersection, Material, Matrix4x4, Props, Ray, Shape, Tuple};
 use std::any::Any;
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug)]
 pub struct Sphere {
     props: Props,
 }
@@ -30,7 +30,7 @@ impl Sphere {
         self
     }
 
-    pub fn build(self) -> Box<dyn Shape> {
+    pub fn shape(self) -> Box<dyn Shape> {
         Box::new(self)
     }
 }
@@ -70,6 +70,10 @@ impl Shape for Sphere {
         self
     }
 
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+
     fn shape_eq(&self, other: &dyn Any) -> bool {
         match other.downcast_ref::<Self>() {
             Some(_) => true,
@@ -92,7 +96,7 @@ mod tests {
     #[test]
     fn sphere_glass() {
         // a helper for producing a sphere with a glassy material
-        let s = Sphere::glass().build();
+        let s = Sphere::glass().shape();
         assert_eq!(s.transform(), &Matrix4x4::identity());
         assert_eq!(s.material().transparency, 1.0);
         assert_eq!(s.material().refractive_index, 1.5);
