@@ -7,7 +7,7 @@ pub enum Normal {
     Smooth(Tuple, Tuple, Tuple),
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 pub struct Triangle {
     props: Props,
     pub p1: Tuple,
