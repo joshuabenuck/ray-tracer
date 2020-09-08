@@ -27,17 +27,6 @@ impl ObjParser {
         Ok(parser)
     }
 
-    fn parse_vertices(exprs: &mut std::str::Split<&str>) -> Result<(f64, f64, f64)> {
-        let x = exprs.next().unwrap();
-        let y = exprs.next().unwrap();
-        let z = exprs.next().unwrap();
-
-        let x: f64 = x.parse()?;
-        let y: f64 = y.parse()?;
-        let z: f64 = z.parse()?;
-        Ok((x, y, z))
-    }
-
     fn parse_faces(exprs: &mut std::str::Split<&str>) -> Result<Vec<(usize, usize, usize)>> {
         // using 1-based indexes. put in a dummy entry to start
         let mut faces = vec![(0, 0, 0)];
@@ -60,6 +49,10 @@ impl ObjParser {
         // using 1-based indexes. put in a dummy entry to start
         let mut f64s = vec![0.0];
         for p in exprs {
+            let p = p.trim();
+            if p.len() == 0 {
+                continue;
+            }
             f64s.push(p.parse()?);
         }
 
@@ -97,8 +90,8 @@ impl ObjParser {
             let command = exprs.next().unwrap();
             match command {
                 "v" => {
-                    let (x, y, z) = Self::parse_vertices(&mut exprs)?;
-                    self.vertices.push(pt(x, y, z));
+                    let vs = Self::parse_f64s(&mut exprs)?;
+                    self.vertices.push(pt(vs[1], vs[2], vs[3]));
                 }
                 "f" => {
                     for triangle in self.fan_triangulation(Self::parse_faces(&mut exprs)?) {
@@ -288,8 +281,9 @@ mod tests {
     #[test]
     fn faces_with_normals() -> Result<()> {
         // faces with normals
+        // two spaces after v
         let contents = "
-        v 0 1 0
+        v  0 1 0
         v -1 0 0
         v 1 0 0
 
