@@ -1,6 +1,7 @@
 mod intersection;
 mod material;
 mod matrix;
+mod obj;
 mod pattern;
 mod ray;
 mod scene;
@@ -11,6 +12,7 @@ mod tuple;
 pub use intersection::{schlick, Comps, Intersection, Intersections};
 pub use material::{lighting, m, Material};
 pub use matrix::{id, Matrix2x2, Matrix3x3, Matrix4x4};
+pub use obj::ObjParser;
 pub use pattern::{
     checkers_pattern, gradient_pattern, ring_pattern, stripe_pattern, stripe_patternt,
     test_pattern, Pattern,

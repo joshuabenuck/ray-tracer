@@ -3,7 +3,7 @@ use std::any::Any;
 
 pub struct Group {
     props: Props,
-    children: Vec<Box<dyn Shape>>,
+    pub children: Vec<Box<dyn Shape>>,
 }
 
 impl Group {
