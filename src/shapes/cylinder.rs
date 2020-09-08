@@ -115,7 +115,7 @@ impl Shape for Cylinder {
         xs
     }
 
-    fn local_normal_at(&self, local_point: Tuple) -> Tuple {
+    fn local_normal_at(&self, local_point: Tuple, _i: &Intersection) -> Tuple {
         // compute the square of the distance from the y axis
         let dist = local_point.x.powi(2) + local_point.z.powi(2);
 
@@ -238,7 +238,7 @@ mod tests {
         // normal vector on a cylinder
         fn test(point: Tuple, normal: Tuple) {
             let cyl = Cylinder::default();
-            let n = cyl.local_normal_at(point);
+            let n = cyl.local_normal_at(point, &Intersection::new(0.0, &cyl));
             assert_eq!(n, normal);
         }
         test(pt(1.0, 0.0, 0.0), v(1.0, 0.0, 0.0));
@@ -252,7 +252,7 @@ mod tests {
         // the normal vector on a cylinder's end caps
         fn test(point: Tuple, normal: Tuple) {
             let cyl = Cylinder::new(1.0, 2.0, true);
-            let n = cyl.local_normal_at(point);
+            let n = cyl.local_normal_at(point, &Intersection::new(0.0, &cyl));
             assert_eq!(n, normal);
         }
 

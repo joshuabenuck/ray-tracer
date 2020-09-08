@@ -65,7 +65,7 @@ impl Shape for Cube {
         vec![Intersection::new(tmin, self), Intersection::new(tmax, self)]
     }
 
-    fn local_normal_at(&self, local_point: Tuple) -> Tuple {
+    fn local_normal_at(&self, local_point: Tuple, _i: &Intersection) -> Tuple {
         let maxc = local_point
             .x
             .abs()
@@ -161,7 +161,7 @@ mod tests {
         // the normal of the surface of a cube
         fn test(point: Tuple, normal: Tuple) {
             let c = Cube::new();
-            let n = c.normal_at(point);
+            let n = c.normal_at(point, &Intersection::new(0.0, &c));
             assert_eq!(n, normal);
         }
 

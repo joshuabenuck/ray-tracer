@@ -39,9 +39,9 @@ pub trait Shape {
         self.local_intersect(&ray)
     }
     fn local_intersect(&'_ self, ray: &Ray) -> Vec<Intersection<'_>>;
-    fn normal_at(&self, world_point: Tuple) -> Tuple {
+    fn normal_at(&self, world_point: Tuple, i: &Intersection) -> Tuple {
         let object_point = self.world_to_object(world_point);
-        let object_normal = self.local_normal_at(object_point);
+        let object_normal = self.local_normal_at(object_point, i);
         self.normal_to_world(object_normal)
     }
     fn world_to_object(&self, point: Tuple) -> Tuple {
@@ -66,7 +66,7 @@ pub trait Shape {
 
         normal
     }
-    fn local_normal_at(&self, local_point: Tuple) -> Tuple;
+    fn local_normal_at(&self, local_point: Tuple, i: &Intersection) -> Tuple;
     fn common(&self) -> &Props;
     fn common_mut(&mut self) -> &mut Props;
     fn transform(&self) -> &Matrix4x4 {
@@ -142,7 +142,7 @@ mod tests {
             Vec::new()
         }
 
-        fn local_normal_at(&self, local_point: Tuple) -> Tuple {
+        fn local_normal_at(&self, local_point: Tuple, _i: &Intersection) -> Tuple {
             v(local_point.x, local_point.y, local_point.z)
         }
 
@@ -223,13 +223,16 @@ mod tests {
         // computing the normal on a translated shape
         let mut s = TestShape::new();
         s.set_transform(Matrix4x4::translation(0.0, 1.0, 0.0));
-        let n = s.normal_at(pt(0.0, 1.70711, -0.70711));
+        let n = s.normal_at(pt(0.0, 1.70711, -0.70711), &Intersection::new(0.0, &s));
         assert_eq!(n, v(0.0, 0.70711, -0.70711));
 
         // computing the normal on a transformed shape
         let mut s = TestShape::new();
         s.set_transform(Matrix4x4::scaling(1.0, 0.5, 1.0) * Matrix4x4::rotation_z(PI / 5.0));
-        let n = s.normal_at(pt(0.0, 2.0_f64 / 2.0, -2.0_f64 / 2.0));
+        let n = s.normal_at(
+            pt(0.0, 2.0_f64 / 2.0, -2.0_f64 / 2.0),
+            &Intersection::new(0.0, &s),
+        );
         assert_eq!(n, v(0.0, 0.97014, -0.24254));
     }
 }

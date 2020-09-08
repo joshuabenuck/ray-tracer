@@ -44,7 +44,7 @@ impl Shape for Group {
         xs
     }
 
-    fn local_normal_at(&self, _local_point: Tuple) -> Tuple {
+    fn local_normal_at(&self, _local_point: Tuple, _i: &Intersection) -> Tuple {
         unreachable!()
     }
 
@@ -210,8 +210,12 @@ mod tests {
             .as_any()
             .downcast_ref::<Group>()
             .unwrap()
-            .children[0];
-        let n = s.normal_at(pt(1.7321, 1.1547, -5.5774));
+            .children[0]
+            .as_any()
+            .downcast_ref::<Sphere>()
+            .unwrap();
+        let i = &Intersection::new(0.0, *s);
+        let n = s.normal_at(pt(1.7321, 1.1547, -5.5774), &i);
         assert_eq!(n, v(0.2857, 0.42854, -0.85716));
     }
 }

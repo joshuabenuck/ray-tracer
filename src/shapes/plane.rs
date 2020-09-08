@@ -38,7 +38,7 @@ impl Shape for Plane {
         }
     }
 
-    fn local_normal_at(&self, _local_point: Tuple) -> Tuple {
+    fn local_normal_at(&self, _local_point: Tuple, _i: &Intersection) -> Tuple {
         v(0.0, 1.0, 0.0)
     }
 
@@ -109,9 +109,10 @@ mod tests {
     fn plane_normal_at() {
         // the normal of a plane is constant everywhere
         let p = Plane::new();
-        let n1 = p.normal_at(pt(0.0, 0.0, 0.0));
-        let n2 = p.normal_at(pt(10.0, 0.0, -10.0));
-        let n3 = p.normal_at(pt(-5.0, 0.0, 150.0));
+        let i = Intersection::new(0.0, &p);
+        let n1 = p.normal_at(pt(0.0, 0.0, 0.0), &i);
+        let n2 = p.normal_at(pt(10.0, 0.0, -10.0), &i);
+        let n3 = p.normal_at(pt(-5.0, 0.0, 150.0), &i);
         assert_eq!(n1, v(0.0, 1.0, 0.0));
         assert_eq!(n2, v(0.0, 1.0, 0.0));
         assert_eq!(n3, v(0.0, 1.0, 0.0));

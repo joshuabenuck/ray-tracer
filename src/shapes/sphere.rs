@@ -54,7 +54,7 @@ impl Shape for Sphere {
         vec![Intersection::new(t1, self), Intersection::new(t2, self)]
     }
 
-    fn local_normal_at(&self, local_point: Tuple) -> Tuple {
+    fn local_normal_at(&self, local_point: Tuple, _i: &Intersection) -> Tuple {
         local_point - pt(0.0, 0.0, 0.0)
     }
 
@@ -161,23 +161,27 @@ mod tests {
     fn sphere_normal_at() {
         // the normal on a sphere at a point on the x axis
         let s = Sphere::new();
-        let n = s.normal_at(pt(1.0, 0.0, 0.0));
+        let i = Intersection::new(0.0, &s);
+        let n = s.normal_at(pt(1.0, 0.0, 0.0), &i);
         assert_eq!(n, v(1.0, 0.0, 0.0));
 
         // the normal on a sphere at a point on the y axis
-        let n = s.normal_at(pt(0.0, 1.0, 0.0));
+        let n = s.normal_at(pt(0.0, 1.0, 0.0), &i);
         assert_eq!(n, v(0.0, 1.0, 0.0));
 
         // the normal on a sphere at a point on the y axis
-        let n = s.normal_at(pt(0.0, 0.0, 1.0));
+        let n = s.normal_at(pt(0.0, 0.0, 1.0), &i);
         assert_eq!(n, v(0.0, 0.0, 1.0));
 
         // the normal on a sphere at a point on a nonaxial point
-        let n = s.normal_at(pt(
-            3.0_f64.sqrt() / 3.0,
-            3.0_f64.sqrt() / 3.0,
-            3.0_f64.sqrt() / 3.0,
-        ));
+        let n = s.normal_at(
+            pt(
+                3.0_f64.sqrt() / 3.0,
+                3.0_f64.sqrt() / 3.0,
+                3.0_f64.sqrt() / 3.0,
+            ),
+            &i,
+        );
         assert_eq!(
             n,
             v(

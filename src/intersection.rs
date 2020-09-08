@@ -41,6 +41,7 @@ pub struct Comps<'a> {
 pub struct Intersection<'a> {
     pub t: f64,
     pub object: &'a dyn Shape,
+    pub uv: Option<(f64, f64)>,
 }
 
 impl PartialEq for Intersection<'_> {
@@ -51,7 +52,19 @@ impl PartialEq for Intersection<'_> {
 
 impl<'a> Intersection<'a> {
     pub fn new(t: f64, object: &'a dyn Shape) -> Intersection<'a> {
-        Intersection { t, object }
+        Intersection {
+            t,
+            object,
+            uv: None,
+        }
+    }
+
+    pub fn with_uv(t: f64, object: &'a dyn Shape, u: f64, v: f64) -> Intersection<'a> {
+        Intersection {
+            t,
+            object,
+            uv: Some((u, v)),
+        }
     }
 
     pub fn prepare_computations(&self, ray: &Ray, xs: &Vec<Intersection>) -> Comps {
@@ -62,7 +75,7 @@ impl<'a> Intersection<'a> {
         // precompute some useful values
         let point = ray.position(t);
         let eyev = -ray.direction;
-        let normalv = object.normal_at(point);
+        let normalv = object.normal_at(point, &self);
         let inside = normalv.dot(&eyev) < 0.0;
         let normalv = if inside { -normalv } else { normalv };
         let reflectv = ray.direction.reflect(&normalv);

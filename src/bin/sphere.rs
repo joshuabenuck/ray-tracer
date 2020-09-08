@@ -47,7 +47,7 @@ fn main() -> Result<(), std::io::Error> {
 
             if let Some(hit) = xs.hit() {
                 let point = r.position(hit.t);
-                let normal = hit.object.normal_at(point);
+                let normal = hit.object.normal_at(point, &hit);
                 let eye = -r.direction;
                 let color = lighting(
                     &hit.object.material(),
