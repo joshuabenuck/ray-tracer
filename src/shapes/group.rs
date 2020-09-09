@@ -83,6 +83,15 @@ impl Shape for Group {
             }
         }
     }
+
+    fn includes(&self, other: &dyn Shape) -> bool {
+        for child in &self.children {
+            if child.includes(other) {
+                return true;
+            }
+        }
+        false
+    }
 }
 
 #[cfg(test)]

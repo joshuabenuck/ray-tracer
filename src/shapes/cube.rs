@@ -103,6 +103,10 @@ impl Shape for Cube {
             None => false,
         }
     }
+
+    fn includes(&self, other: &dyn Shape) -> bool {
+        self as &dyn Shape == other
+    }
 }
 
 impl<'a> From<Cube> for Box<dyn Shape + 'a> {

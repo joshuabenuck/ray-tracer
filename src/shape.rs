@@ -94,6 +94,7 @@ pub trait Shape {
         self.common_mut().parent_transforms = parent_transforms;
     }
     fn refresh_parents(&mut self) {}
+    fn includes(&self, other: &dyn Shape) -> bool;
 }
 
 impl Debug for dyn Shape + '_ {
@@ -167,6 +168,10 @@ mod tests {
                 Some(_) => true,
                 None => false,
             }
+        }
+
+        fn includes(&self, other: &dyn Shape) -> bool {
+            self as &dyn Shape == other
         }
     }
 

@@ -1,3 +1,4 @@
+mod csg;
 mod cube;
 mod cylinder;
 mod group;
@@ -5,6 +6,7 @@ mod plane;
 mod sphere;
 mod triangle;
 
+pub use csg::Csg;
 pub use cube::Cube;
 pub use cylinder::Cylinder;
 pub use group::Group;

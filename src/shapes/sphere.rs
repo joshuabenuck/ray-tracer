@@ -80,6 +80,10 @@ impl Shape for Sphere {
             None => false,
         }
     }
+
+    fn includes(&self, other: &dyn Shape) -> bool {
+        self as &dyn Shape == other
+    }
 }
 
 impl<'a> From<Sphere> for Box<dyn Shape + 'a> {

@@ -149,6 +149,10 @@ impl Shape for Cylinder {
             None => false,
         }
     }
+
+    fn includes(&self, other: &dyn Shape) -> bool {
+        self as &dyn Shape == other
+    }
 }
 
 #[cfg(test)]

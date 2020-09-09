@@ -37,7 +37,7 @@ pub struct Comps<'a> {
     pub n2: f64,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Intersection<'a> {
     pub t: f64,
     pub object: &'a dyn Shape,

@@ -64,6 +64,10 @@ impl Shape for Plane {
             None => false,
         }
     }
+
+    fn includes(&self, other: &dyn Shape) -> bool {
+        self as &dyn Shape == other
+    }
 }
 
 impl<'a> From<Plane> for Box<dyn Shape + 'a> {

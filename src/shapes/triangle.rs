@@ -114,6 +114,10 @@ impl Shape for Triangle {
             None => false,
         }
     }
+
+    fn includes(&self, other: &dyn Shape) -> bool {
+        self as &dyn Shape == other
+    }
 }
 
 impl<'a> From<Triangle> for Box<dyn Shape + 'a> {
