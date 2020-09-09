@@ -1,6 +1,8 @@
+use anyhow::Result;
 use ray_tracer::*;
+use std::f64::consts::PI;
 
-fn main() -> Result<(), std::io::Error> {
+fn main() -> Result<()> {
     let mut camera = Camera::new(400, 200, 1.152);
     camera.transform = view_transform(pt(-2.6, 1.5, -3.9), pt(-0.6, 1.0, -0.8), v(0.0, 1.0, 0.0));
 
@@ -85,6 +87,16 @@ fn main() -> Result<(), std::io::Error> {
     let red = Sphere::new()
         .transform(id().translate(-0.6, 1.0, 0.6))
         .material(m().rgb(1.0, 0.3, 0.2).specular(0.4).shininess(5.0));
+    let teapot_contents = std::fs::read_to_string("./objs/teapot_smooth.obj")?;
+    let teapot = ObjParser::from_str(&teapot_contents)?
+        .into_group()
+        .transform(
+            id().rotate_x(-PI / 2.0)
+                .scale(0.07, 0.07, 0.07)
+                .translate(-0.6, 0.0, 0.6),
+        )
+        .shape();
+
     let blue = Sphere::new()
         .transform(id().scale(0.7, 0.7, 0.7).translate(0.6, 0.7, -0.6))
         .material(
@@ -123,10 +135,11 @@ fn main() -> Result<(), std::io::Error> {
         sphere2.into(),
         sphere3.into(),
         sphere4.into(),
-        red.into(),
+        teapot.into(),
         blue.into(),
         green.into(),
     ];
     let image = camera.render(&mut world);
-    std::fs::write("./reflect_refract.ppm", image.to_ppm())
+    std::fs::write("./reflect_refract.ppm", image.to_ppm());
+    Ok(())
 }
