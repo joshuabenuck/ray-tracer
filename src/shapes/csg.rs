@@ -32,12 +32,15 @@ impl Csg {
     }
 
     pub fn union(left: Box<dyn Shape>, right: Box<dyn Shape>) -> Csg {
-        Csg {
-            props: Props::default(),
-            op: Op::Union,
-            left,
-            right,
-        }
+        Csg::new(Op::Union, left, right)
+    }
+
+    pub fn difference(left: Box<dyn Shape>, right: Box<dyn Shape>) -> Csg {
+        Csg::new(Op::Difference, left, right)
+    }
+
+    pub fn intersection(left: Box<dyn Shape>, right: Box<dyn Shape>) -> Csg {
+        Csg::new(Op::Intersection, left, right)
     }
 
     fn intersection_allowed(op: Op, hit: Hit, inl: bool, inr: bool) -> bool {
@@ -76,6 +79,10 @@ impl Csg {
             }
         }
         result
+    }
+
+    pub fn shape(self) -> Box<dyn Shape> {
+        Box::new(self)
     }
 }
 
