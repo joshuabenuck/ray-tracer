@@ -208,6 +208,10 @@ impl Camera {
         }
     }
 
+    pub fn transform(&mut self, transform: Matrix4x4) {
+        self.transform = transform;
+    }
+
     pub fn ray_for_pixel(&self, px: usize, py: usize) -> Ray {
         let px = px as f64;
         let py = py as f64;
