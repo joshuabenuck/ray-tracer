@@ -17,6 +17,7 @@ The Cover Image of the Book
 ![Book Cover Image](images/029.png)
 
 Demonstration of OBJ File Rendering
+
 ![Reflect with Teapot](images/026.png)
 
 ## Status
