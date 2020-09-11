@@ -26,7 +26,7 @@ impl<'a> World {
     }
 
     pub fn shade_hit(&self, comps: &Comps, remaining: usize) -> Color {
-        let mut cs = self.lights.iter().map(|l| {
+        let colors = self.lights.iter().map(|l| {
             let object = comps.object;
             let surface = lighting(
                 &object.material(),
@@ -35,7 +35,7 @@ impl<'a> World {
                 &comps.over_point,
                 &comps.eyev,
                 &comps.normalv,
-                self.is_shadowed(comps.over_point),
+                self.is_shadowed(l, comps.over_point),
             );
             let reflected = self.reflected_color(&comps, remaining);
             let refracted = self.refracted_color(&comps, remaining);
@@ -47,11 +47,7 @@ impl<'a> World {
             }
             surface + reflected + refracted
         });
-        let mut color = cs.next().unwrap();
-        for c in cs {
-            color = color + c;
-        }
-        color
+        colors.sum()
     }
 
     pub fn color_at(&self, ray: &Ray, remaining: usize) -> Color {
@@ -66,8 +62,8 @@ impl<'a> World {
         Color::new(0.0, 0.0, 0.0)
     }
 
-    pub fn is_shadowed(&self, point: Tuple) -> bool {
-        let v = self.lights[0].position - point;
+    pub fn is_shadowed(&self, light: &PointLight, point: Tuple) -> bool {
+        let v = light.position - point;
         let distance = v.magnitude();
         let direction = v.normalize();
 
@@ -476,19 +472,19 @@ mod tests {
         // there is no shadow when nothing is collinear with point and light
         let w = World::default();
         let p = pt(0.0, 10.0, 0.0);
-        assert_eq!(w.is_shadowed(p), false);
+        assert_eq!(w.is_shadowed(&w.lights[0], p), false);
 
         // the shadow when an object is between the point and the light
         let p = pt(10.0, -10.0, 10.0);
-        assert_eq!(w.is_shadowed(p), true);
+        assert_eq!(w.is_shadowed(&w.lights[0], p), true);
 
         // there is no shadow when an object is behind the light
         let p = pt(-20.0, 20.0, -20.0);
-        assert_eq!(w.is_shadowed(p), false);
+        assert_eq!(w.is_shadowed(&w.lights[0], p), false);
 
         // there is no shadow when an object is behind the point
         let p = pt(-2.0, 2.0, -2.0);
-        assert_eq!(w.is_shadowed(p), false);
+        assert_eq!(w.is_shadowed(&w.lights[0], p), false);
     }
 
     #[test]

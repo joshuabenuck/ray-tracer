@@ -1,6 +1,9 @@
 use crate::EPSILON;
-use std::cmp::{max, min};
 use std::ops::{Add, Div, Mul, Neg, Sub};
+use std::{
+    cmp::{max, min},
+    iter::Sum,
+};
 
 #[inline]
 pub fn pt(x: f64, y: f64, z: f64) -> Tuple {
@@ -239,6 +242,16 @@ impl Add for Color {
             green: self.green + other.green,
             blue: self.blue + other.blue,
         }
+    }
+}
+
+impl Sum for Color {
+    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+        let mut color = Color::new(0.0, 0.0, 0.0);
+        for c in iter {
+            color = color + c;
+        }
+        color
     }
 }
 

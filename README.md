@@ -18,7 +18,7 @@ Reflections and Refractions Scene
 
 The Cover Image of the Book
 
-![Book Cover Image](images/029.png)
+![Book Cover Image](images/032.png)
 
 Demonstration of OBJ File Rendering
 
@@ -49,17 +49,16 @@ This implementation supports the majority of features described in the book. The
 - [ ] B1 - [Rendering Soft Shadows](http://www.raytracerchallenge.com/bonus/area-light.html)
 - [ ] B2 - [Bounding box and hierarchies](http://www.raytracerchallenge.com/bonus/bounding-boxes.html)
 - [ ] B3 - [Texture Mapping](http://www.raytracerchallenge.com/bonus/texture-mapping.html)
+- [x] Render [Shadow Puppets Scene Description](https://forum.raytracerchallenge.com/thread/2/shadow-puppets-scene-description)
 - [x] Render [Table Scene Description](https://forum.raytracerchallenge.com/thread/6/tables-scene-description)
+- [x] Render [Book Cover Scene Description](scenes/cover.yaml)
 
 ## Missing Features
 
 These are features or images from the book missing in the implemention.
-- [ ] Chapter 6 - Support for Multiple Lights
 - [ ] Chapter 13 - Cones
 - [ ] Ability to render [groups scene description](https://forum.raytracerchallenge.com/thread/13/groups-scene-description)
-- [ ] Ability to render [shadow puppets scene description](https://forum.raytracerchallenge.com/thread/2/shadow-puppets-scene-description)
 - [ ] Ability to render [cylinders scene description](https://forum.raytracerchallenge.com/thread/7/cylinders-scene-description)
-- [ ] Ability to render the two light sources used in the cover image scene description
 
 ## Possible Future Direction
 

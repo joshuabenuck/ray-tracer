@@ -73,8 +73,12 @@ fn to_transform(transforms: &Vec<Yaml>, defines: &HashMap<String, Matrix4x4>) ->
     Ok(transform)
 }
 
-fn to_material(obj: &Yaml, transforms: &HashMap<String, Matrix4x4>) -> Result<Material> {
-    let mut material = Material::new();
+fn apply_material(
+    material: Material,
+    obj: &Yaml,
+    transforms: &HashMap<String, Matrix4x4>,
+) -> Result<Material> {
+    let mut material = material;
     let props = &obj["pattern"];
     if props != &Yaml::BadValue {
         let r#type = props["type"].as_str().unwrap();
@@ -131,6 +135,33 @@ fn to_material(obj: &Yaml, transforms: &HashMap<String, Matrix4x4>) -> Result<Ma
     Ok(material)
 }
 
+fn to_material(obj: &Yaml, transforms: &HashMap<String, Matrix4x4>) -> Result<Material> {
+    apply_material(Material::new(), obj, transforms)
+}
+
+fn apply_shape(
+    shape: &mut dyn Shape,
+    obj: &Yaml,
+    materials: &HashMap<String, Material>,
+    transforms: &HashMap<String, Matrix4x4>,
+) -> Result<()> {
+    match &obj["transform"] {
+        Yaml::Array(ts) => shape.set_transform(to_transform(ts, &transforms)?),
+        Yaml::String(name) => shape.set_transform(transforms[name].clone()),
+        _ => {}
+    }
+    let props = &obj["material"];
+    match props {
+        Yaml::Hash(_) => shape.set_material(to_material(&props, &transforms)?),
+        Yaml::String(name) => shape.set_material(materials[name].clone()),
+        _ => {}
+    }
+    if let Some(shadow) = &obj["shadow"].as_bool() {
+        shape.set_shadow(*shadow);
+    }
+    Ok(())
+}
+
 fn main() -> Result<()> {
     let path = std::env::args().nth(1).expect("no yaml file provided");
     let contents = std::fs::read_to_string(&path)?;
@@ -168,48 +199,19 @@ fn main() -> Result<()> {
                     world.lights.push(light);
                 }
                 "cube" => {
-                    let mut cube = Cube::new();
-                    match &obj["transform"] {
-                        Yaml::Array(ts) => cube.set_transform(to_transform(ts, &transforms)?),
-                        Yaml::String(name) => cube.set_transform(transforms[name].clone()),
-                        _ => {}
-                    }
-                    let props = &obj["material"];
-                    match props {
-                        Yaml::Hash(_) => cube.set_material(to_material(&props, &transforms)?),
-                        Yaml::String(name) => cube.set_material(materials[name].clone()),
-                        _ => {}
-                    }
-                    if let Some(shadow) = &obj["shadow"].as_bool() {
-                        cube.set_shadow(*shadow);
-                    }
-                    world.objects.push(cube.shape());
+                    let mut cube = Cube::new().shape();
+                    apply_shape(&mut *cube, &obj, &materials, &transforms)?;
+                    world.objects.push(cube);
                 }
                 "plane" => {
-                    let mut plane = Plane::new();
-                    match &obj["transform"] {
-                        Yaml::Array(ts) => plane.set_transform(to_transform(ts, &transforms)?),
-                        Yaml::String(name) => plane.set_transform(transforms[name].clone()),
-                        _ => {}
-                    }
-                    let props = &obj["material"];
-                    match props {
-                        Yaml::Hash(_) => plane.set_material(to_material(&props, &transforms)?),
-                        Yaml::String(name) => plane.set_material(materials[name].clone()),
-                        _ => {}
-                    }
-                    world.objects.push(plane.shape());
+                    let mut plane = Plane::new().shape();
+                    apply_shape(&mut *plane, &obj, &materials, &transforms)?;
+                    world.objects.push(plane);
                 }
                 "sphere" => {
-                    let mut sphere = Sphere::new();
-                    if let Yaml::Array(ts) = &obj["transform"] {
-                        sphere.set_transform(to_transform(ts, &transforms)?);
-                    }
-                    let props = &obj["material"];
-                    if props != &Yaml::BadValue {
-                        sphere.set_material(to_material(&props, &transforms)?);
-                    }
-                    world.objects.push(sphere.shape());
+                    let mut sphere = Sphere::new().shape();
+                    apply_shape(&mut *sphere, &obj, &materials, &transforms)?;
+                    world.objects.push(sphere);
                 }
                 _ => {
                     println!("Uknown object type: {}", r#type);
@@ -219,7 +221,14 @@ fn main() -> Result<()> {
         if let Yaml::String(name) = &obj["define"] {
             println!("Defining {}", name);
             if name.contains("-material") {
-                materials.insert(name.clone(), to_material(&obj["value"], &transforms)?);
+                let mut base = Material::new();
+                if let Some(extend) = obj["extend"].as_str() {
+                    base = materials[extend].clone();
+                }
+                materials.insert(
+                    name.clone(),
+                    apply_material(base, &obj["value"], &transforms)?,
+                );
             } else if name.contains("-transform") {
                 if let Yaml::Array(value) = &obj["value"] {
                     transforms.insert(name.clone(), to_transform(&value, &transforms)?);
