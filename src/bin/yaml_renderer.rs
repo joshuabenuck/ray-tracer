@@ -162,6 +162,69 @@ fn apply_shape(
     Ok(())
 }
 
+fn add_shape(
+    obj: &Yaml,
+    materials: &HashMap<String, Material>,
+    transforms: &HashMap<String, Matrix4x4>,
+    shapes: &HashMap<String, Yaml>,
+) -> Result<Box<dyn Shape>> {
+    let r#type = obj["add"].as_str().unwrap();
+    println!("Adding {}", r#type);
+    let shape = match r#type {
+        "cube" => {
+            let mut cube = Cube::new().shape();
+            apply_shape(&mut *cube, &obj, &materials, &transforms)?;
+            cube
+        }
+        "plane" => {
+            let mut plane = Plane::new().shape();
+            apply_shape(&mut *plane, &obj, &materials, &transforms)?;
+            plane
+        }
+        "sphere" => {
+            let mut sphere = Sphere::new().shape();
+            apply_shape(&mut *sphere, &obj, &materials, &transforms)?;
+            sphere
+        }
+        "cylinder" => {
+            let min = to_f64(&obj["min"])?;
+            let max = to_f64(&obj["max"])?;
+            let closed = obj["closed"].as_bool().unwrap();
+            let mut cylinder = Cylinder::new(min, max, closed).shape();
+            apply_shape(&mut *cylinder, &obj, &materials, &transforms)?;
+            cylinder
+        }
+        "cone" => {
+            let min = to_f64(&obj["min"])?;
+            let max = to_f64(&obj["max"])?;
+            let closed = obj["closed"].as_bool().unwrap();
+            let mut cone = Cone::new(min, max, closed).shape();
+            apply_shape(&mut *cone, &obj, &materials, &transforms)?;
+            cone
+        }
+        "group" => {
+            let mut group = Group::new();
+            for child_obj in obj["children"].as_vec().unwrap() {
+                let child = add_shape(child_obj, materials, transforms, shapes)?;
+                group.add_child(child);
+            }
+            let mut group = group.shape();
+            apply_shape(&mut *group, &obj, &materials, &transforms)?;
+            group
+        }
+        name => {
+            if let Some(def) = shapes.get(name) {
+                let mut shape = add_shape(&def.clone(), materials, transforms, shapes)?;
+                apply_shape(&mut *shape, &obj, &materials, &transforms)?;
+                shape
+            } else {
+                panic!("Unknown shape: {}", name);
+            }
+        }
+    };
+    Ok(shape)
+}
+
 fn main() -> Result<()> {
     let path = std::env::args().nth(1).expect("no yaml file provided");
     let contents = std::fs::read_to_string(&path)?;
@@ -170,6 +233,7 @@ fn main() -> Result<()> {
     let mut camera: Option<Camera> = None;
     let mut materials: HashMap<String, Material> = HashMap::new();
     let mut transforms: HashMap<String, Matrix4x4> = HashMap::new();
+    let mut shapes: HashMap<String, Yaml> = HashMap::new();
     for obj in scene[0].as_vec().unwrap() {
         if let Yaml::String(r#type) = &obj["add"] {
             println!("Adding {}", r#type);
@@ -198,28 +262,11 @@ fn main() -> Result<()> {
                     let light = PointLight::new(at, intensity);
                     world.lights.push(light);
                 }
-                "cube" => {
-                    let mut cube = Cube::new().shape();
-                    apply_shape(&mut *cube, &obj, &materials, &transforms)?;
-                    world.objects.push(cube);
-                }
-                "plane" => {
-                    let mut plane = Plane::new().shape();
-                    apply_shape(&mut *plane, &obj, &materials, &transforms)?;
-                    world.objects.push(plane);
-                }
-                "sphere" => {
-                    let mut sphere = Sphere::new().shape();
-                    apply_shape(&mut *sphere, &obj, &materials, &transforms)?;
-                    world.objects.push(sphere);
-                }
-                "cylinder" => {
-                    let min = to_f64(&obj["min"])?;
-                    let max = to_f64(&obj["max"])?;
-                    let closed = obj["closed"].as_bool().unwrap();
-                    let mut cylinder = Cylinder::new(min, max, closed).shape();
-                    apply_shape(&mut *cylinder, &obj, &materials, &transforms)?;
-                    world.objects.push(cylinder);
+                "group" | "cube" | "plane" | "sphere" | "cylinder" | "cone" | "wacky" | "cap"
+                | "leg" => {
+                    world
+                        .objects
+                        .push(add_shape(&obj, &materials, &transforms, &shapes)?);
                 }
                 _ => {
                     println!("Uknown object type: {}", r#type);
@@ -228,7 +275,10 @@ fn main() -> Result<()> {
         }
         if let Yaml::String(name) = &obj["define"] {
             println!("Defining {}", name);
-            if name.contains("-material") {
+            if name.contains("leg") || name.contains("cap") || name.contains("wacky") {
+                let value = &obj["value"];
+                shapes.insert(name.clone(), value.clone());
+            } else if name.contains("-material") {
                 let mut base = Material::new();
                 if let Some(extend) = obj["extend"].as_str() {
                     base = materials[extend].clone();
