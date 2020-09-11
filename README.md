@@ -16,6 +16,10 @@ Reflections and Refractions Scene
 
 ![Reflect and Refract](images/020.png)
 
+Cylinders
+
+![Cylinders](images/033.png)
+
 The Cover Image of the Book
 
 ![Book Cover Image](images/032.png)
@@ -51,6 +55,7 @@ This implementation supports the majority of features described in the book. The
 - [ ] B3 - [Texture Mapping](http://www.raytracerchallenge.com/bonus/texture-mapping.html)
 - [x] Render [Shadow Puppets Scene Description](https://forum.raytracerchallenge.com/thread/2/shadow-puppets-scene-description)
 - [x] Render [Table Scene Description](https://forum.raytracerchallenge.com/thread/6/tables-scene-description)
+- [x] Render [Cylinders Scene Description](https://forum.raytracerchallenge.com/thread/7/cylinders-scene-description)
 - [x] Render [Book Cover Scene Description](scenes/cover.yaml)
 
 ## Missing Features
@@ -58,7 +63,6 @@ This implementation supports the majority of features described in the book. The
 These are features or images from the book missing in the implemention.
 - [ ] Chapter 13 - Cones
 - [ ] Ability to render [groups scene description](https://forum.raytracerchallenge.com/thread/13/groups-scene-description)
-- [ ] Ability to render [cylinders scene description](https://forum.raytracerchallenge.com/thread/7/cylinders-scene-description)
 
 ## Possible Future Direction
 

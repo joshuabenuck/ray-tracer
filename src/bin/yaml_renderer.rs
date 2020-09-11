@@ -213,6 +213,14 @@ fn main() -> Result<()> {
                     apply_shape(&mut *sphere, &obj, &materials, &transforms)?;
                     world.objects.push(sphere);
                 }
+                "cylinder" => {
+                    let min = to_f64(&obj["min"])?;
+                    let max = to_f64(&obj["max"])?;
+                    let closed = obj["closed"].as_bool().unwrap();
+                    let mut cylinder = Cylinder::new(min, max, closed).shape();
+                    apply_shape(&mut *cylinder, &obj, &materials, &transforms)?;
+                    world.objects.push(cylinder);
+                }
                 _ => {
                     println!("Uknown object type: {}", r#type);
                 }
