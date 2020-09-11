@@ -16,9 +16,17 @@ Reflections and Refractions Scene
 
 ![Reflect and Refract](images/020.png)
 
+Sphere Within a Sphere
+
+![Sphere Within a Sphere](images/034.png)
+
 Cylinders
 
 ![Cylinders](images/033.png)
+
+Groups
+
+![Groups](images/035.png)
 
 The Cover Image of the Book
 
@@ -56,19 +64,16 @@ This implementation supports the majority of features described in the book. The
 - [x] Render [Shadow Puppets Scene Description](https://forum.raytracerchallenge.com/thread/2/shadow-puppets-scene-description)
 - [x] Render [Table Scene Description](https://forum.raytracerchallenge.com/thread/6/tables-scene-description)
 - [x] Render [Cylinders Scene Description](https://forum.raytracerchallenge.com/thread/7/cylinders-scene-description)
+- [x] Render [Glass Spheres Scene Description](https://forum.raytracerchallenge.com/thread/180/reproducing-before-fresnel-after-picture)
+- [x] Render [Groups Scene Description](https://forum.raytracerchallenge.com/thread/13/groups-scene-description)
 - [x] Render [Book Cover Scene Description](scenes/cover.yaml)
-
-## Missing Features
-
-These are features or images from the book missing in the implemention.
-- [ ] Chapter 13 - Cones
-- [ ] Ability to render [groups scene description](https://forum.raytracerchallenge.com/thread/13/groups-scene-description)
 
 ## Possible Future Direction
 
 - [ ] Compile to wasm
 - [ ] Export directly to png
 - [ ] Display renders line by line as they are computed
+- [ ] Clean up the mess that is the yaml scene renderer
 
 ## Other Implementations
 
