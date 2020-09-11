@@ -6,6 +6,7 @@ pub struct Props {
     pub transform: Matrix4x4,
     pub material: Material,
     pub parent_transforms: Vec<Matrix4x4>,
+    pub shadow: bool,
 }
 
 impl Default for Props {
@@ -14,6 +15,7 @@ impl Default for Props {
             transform: Matrix4x4::identity(),
             material: Material::new(),
             parent_transforms: Vec::new(),
+            shadow: true,
         }
     }
 }
@@ -95,6 +97,12 @@ pub trait Shape {
     }
     fn refresh_parents(&mut self) {}
     fn includes(&self, other: &dyn Shape) -> bool;
+    fn shadow(&self) -> bool {
+        self.common().shadow
+    }
+    fn set_shadow(&mut self, shadow: bool) {
+        self.common_mut().shadow = shadow;
+    }
 }
 
 impl Debug for dyn Shape + '_ {

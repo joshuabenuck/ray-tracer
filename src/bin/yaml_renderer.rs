@@ -83,7 +83,10 @@ fn to_material(obj: &Yaml, transforms: &HashMap<String, Matrix4x4>) -> Result<Ma
                 if let Yaml::Array(colors) = &props["colors"] {
                     let a = to_color(&colors[0])?;
                     let b = to_color(&colors[1])?;
-                    let pattern = checkers_pattern(a, b);
+                    let mut pattern = checkers_pattern(a, b);
+                    if let Yaml::Array(ts) = &props["transform"] {
+                        pattern.transform = to_transform(ts, &transforms)?;
+                    }
                     material.pattern = Some(pattern);
                 }
             }
@@ -176,6 +179,9 @@ fn main() -> Result<()> {
                         Yaml::Hash(_) => cube.set_material(to_material(&props, &transforms)?),
                         Yaml::String(name) => cube.set_material(materials[name].clone()),
                         _ => {}
+                    }
+                    if let Some(shadow) = &obj["shadow"].as_bool() {
+                        cube.set_shadow(*shadow);
                     }
                     world.objects.push(cube.shape());
                 }

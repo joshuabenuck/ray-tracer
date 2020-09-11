@@ -74,6 +74,10 @@ impl<'a> World {
         let r = Ray::new(point, direction);
         let intersections = self.intersect(&r);
 
+        let intersections: Vec<Intersection> = intersections
+            .into_iter()
+            .filter(|i| i.object.shadow())
+            .collect();
         let h = intersections.hit();
         if let Some(h) = h {
             if h.t < distance {
