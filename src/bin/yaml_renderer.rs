@@ -1,57 +1,82 @@
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Error, Result};
 use ray_tracer::*;
-use std::collections::HashMap;
+use std::convert::{TryFrom, TryInto};
+use std::{collections::HashMap, ops::Index};
 use yaml_rust::{Yaml, YamlLoader};
 
-fn to_v(obj: &Yaml) -> Result<Tuple> {
-    Ok(v(to_f64(&obj[0])?, to_f64(&obj[1])?, to_f64(&obj[2])?))
+struct Definitions {
+    tranforms: HashMap<String, Matrix4x4>,
+    materials: HashMap<String, Material>,
 }
 
-fn to_pt(obj: &Yaml) -> Result<Tuple> {
-    Ok(pt(to_f64(&obj[0])?, to_f64(&obj[1])?, to_f64(&obj[2])?))
+trait YamlExt {
+    fn as_float(&self) -> Result<f64>;
+    fn as_v(&self) -> Result<Tuple>;
+    fn as_pt(&self) -> Result<Tuple>;
+    fn as_color(&self) -> Result<Color>;
 }
 
-fn to_f64(obj: &Yaml) -> Result<f64> {
-    match obj {
-        Yaml::Real(_) => Ok(obj.as_f64().unwrap()),
-        Yaml::Integer(_) => Ok(obj.as_i64().unwrap() as f64),
-        _ => Err(anyhow!("Unable to read f64")),
+impl YamlExt for Yaml {
+    fn as_float(&self) -> Result<f64> {
+        match &self {
+            Yaml::Real(_) => Ok(self.as_f64().unwrap()),
+            Yaml::Integer(_) => Ok(self.as_i64().unwrap() as f64),
+            _ => Err(anyhow!("Unable to read f64")),
+        }
+    }
+
+    fn as_v(&self) -> Result<Tuple> {
+        Ok(v(
+            self[0].as_float()?,
+            self[1].as_float()?,
+            self[2].as_float()?,
+        ))
+    }
+
+    fn as_pt(&self) -> Result<Tuple> {
+        Ok(pt(
+            self[0].as_float()?,
+            self[1].as_float()?,
+            self[2].as_float()?,
+        ))
+    }
+
+    fn as_color(&self) -> Result<Color> {
+        Ok(Color::new(
+            self[0].as_float()?,
+            self[1].as_float()?,
+            self[2].as_float()?,
+        ))
     }
 }
 
-fn to_color(obj: &Yaml) -> Result<Color> {
-    Ok(Color::new(
-        to_f64(&obj[0])?,
-        to_f64(&obj[1])?,
-        to_f64(&obj[2])?,
-    ))
-}
+struct YamlScene {}
 
 fn apply_transform(transform: Matrix4x4, params: &Yaml) -> Result<Matrix4x4> {
     let mut transform = transform;
     let transform_type = params[0].as_str().unwrap();
     match transform_type {
         "rotate-x" => {
-            transform = transform.rotate_x(to_f64(&params[1])?);
+            transform = transform.rotate_x(params[1].as_float()?);
         }
         "rotate-y" => {
-            transform = transform.rotate_y(to_f64(&params[1])?);
+            transform = transform.rotate_y(params[1].as_float()?);
         }
         "rotate-z" => {
-            transform = transform.rotate_z(to_f64(&params[1])?);
+            transform = transform.rotate_z(params[1].as_float()?);
         }
         "scale" => {
             transform = transform.scale(
-                to_f64(&params[1])?,
-                to_f64(&params[2])?,
-                to_f64(&params[3])?,
+                params[1].as_float()?,
+                params[2].as_float()?,
+                params[3].as_float()?,
             );
         }
         "translate" => {
             transform = transform.translate(
-                to_f64(&params[1])?,
-                to_f64(&params[2])?,
-                to_f64(&params[3])?,
+                params[1].as_float()?,
+                params[2].as_float()?,
+                params[3].as_float()?,
             );
         }
         _ => {
@@ -85,8 +110,8 @@ fn apply_material(
         match r#type {
             "checkers" => {
                 if let Yaml::Array(colors) = &props["colors"] {
-                    let a = to_color(&colors[0])?;
-                    let b = to_color(&colors[1])?;
+                    let a = colors[0].as_color()?;
+                    let b = colors[1].as_color()?;
                     let mut pattern = checkers_pattern(a, b);
                     if let Yaml::Array(ts) = &props["transform"] {
                         pattern.transform = to_transform(ts, &transforms)?;
@@ -96,8 +121,8 @@ fn apply_material(
             }
             "stripes" => {
                 if let Yaml::Array(colors) = &props["colors"] {
-                    let a = to_color(&colors[0])?;
-                    let b = to_color(&colors[1])?;
+                    let a = colors[0].as_color()?;
+                    let b = colors[1].as_color()?;
                     let mut pattern = stripe_pattern(a, b);
                     if let Yaml::Array(ts) = &props["transform"] {
                         pattern.transform = to_transform(ts, &transforms)?;
@@ -108,28 +133,28 @@ fn apply_material(
             _ => panic!("Unexpected pattern type: {}", r#type),
         }
     }
-    if let Ok(color) = to_color(&obj["color"]) {
+    if let Ok(color) = obj["color"].as_color() {
         material.color = color;
     }
-    if let Ok(ambient) = to_f64(&obj["ambient"]) {
+    if let Ok(ambient) = obj["ambient"].as_float() {
         material.ambient = ambient;
     }
-    if let Ok(diffuse) = to_f64(&obj["diffuse"]) {
+    if let Ok(diffuse) = obj["diffuse"].as_float() {
         material.diffuse = diffuse;
     }
-    if let Ok(specular) = to_f64(&obj["specular"]) {
+    if let Ok(specular) = obj["specular"].as_float() {
         material.specular = specular;
     }
-    if let Ok(reflective) = to_f64(&obj["reflective"]) {
+    if let Ok(reflective) = obj["reflective"].as_float() {
         material.reflective = reflective;
     }
-    if let Ok(shininess) = to_f64(&obj["shininess"]) {
+    if let Ok(shininess) = obj["shininess"].as_float() {
         material.shininess = shininess;
     }
-    if let Ok(transparency) = to_f64(&obj["transparency"]) {
+    if let Ok(transparency) = obj["transparency"].as_float() {
         material.transparency = transparency;
     }
-    if let Ok(refractive_index) = to_f64(&obj["refractive-index"]) {
+    if let Ok(refractive_index) = obj["refractive-index"].as_float() {
         material.refractive_index = refractive_index;
     }
     Ok(material)
@@ -187,16 +212,16 @@ fn add_shape(
             sphere
         }
         "cylinder" => {
-            let min = to_f64(&obj["min"])?;
-            let max = to_f64(&obj["max"])?;
+            let min = obj["min"].as_float()?;
+            let max = obj["max"].as_float()?;
             let closed = obj["closed"].as_bool().unwrap();
             let mut cylinder = Cylinder::new(min, max, closed).shape();
             apply_shape(&mut *cylinder, &obj, &materials, &transforms)?;
             cylinder
         }
         "cone" => {
-            let min = to_f64(&obj["min"])?;
-            let max = to_f64(&obj["max"])?;
+            let min = obj["min"].as_float()?;
+            let max = obj["max"].as_float()?;
             let closed = obj["closed"].as_bool().unwrap();
             let mut cone = Cone::new(min, max, closed).shape();
             apply_shape(&mut *cone, &obj, &materials, &transforms)?;
@@ -246,19 +271,19 @@ fn main() -> Result<()> {
                     //   to: [-0.6, 1, -0.8]
                     //   up: [0, 1, 0]
                     // println!("{:#?}", obj);
-                    let width = to_f64(&obj["width"])? as usize;
-                    let height = to_f64(&obj["height"])? as usize;
-                    let fov = to_f64(&obj["field-of-view"])?;
-                    let from = to_v(&obj["from"])?;
-                    let to = to_v(&obj["to"])?;
-                    let up = to_v(&obj["up"])?;
+                    let width = obj["width"].as_float()? as usize;
+                    let height = obj["height"].as_float()? as usize;
+                    let fov = obj["field-of-view"].as_float()?;
+                    let from = obj["from"].as_v()?;
+                    let to = obj["to"].as_v()?;
+                    let up = obj["up"].as_v()?;
                     let mut c = Camera::new(width, height, fov);
                     c.transform(view_transform(from, to, up));
                     camera = Some(c);
                 }
                 "light" => {
-                    let at = to_pt(&obj["at"])?;
-                    let intensity = to_color(&obj["intensity"])?;
+                    let at = obj["at"].as_pt()?;
+                    let intensity = obj["intensity"].as_color()?;
                     let light = PointLight::new(at, intensity);
                     world.lights.push(light);
                 }
