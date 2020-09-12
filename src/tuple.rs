@@ -1,4 +1,5 @@
 use crate::EPSILON;
+use image::{ImageBuffer, RgbImage};
 use std::ops::{Add, Div, Mul, Neg, Sub};
 use std::{
     cmp::{max, min},
@@ -358,11 +359,37 @@ impl Canvas {
         }
         ppm
     }
+
+    pub fn to_image(&self) -> RgbImage {
+        let mut img: RgbImage = ImageBuffer::new(self.width as u32, self.height as u32);
+        for (i, pixel) in self.pixels.iter().enumerate() {
+            let x = i % self.width;
+            let y = i / self.width;
+            // Why does this give a different result?
+            // let red = (pixel.red * 255.0) as usize;
+            // let green = (pixel.green * 255.0) as usize;
+            // let blue = (pixel.blue * 255.0) as usize;
+            let (red, green, blue) = Into::<(usize, usize, usize)>::into(*pixel);
+            img.put_pixel(
+                x as u32,
+                y as u32,
+                [red as u8, green as u8, blue as u8].into(),
+            );
+        }
+        img
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn color_convert() {
+        let r = 1.0;
+        let red = (r * 255.0) as u8;
+        assert_eq!(red, 255);
+    }
 
     #[test]
     fn tuple_is_point() {

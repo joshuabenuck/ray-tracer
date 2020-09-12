@@ -12,3 +12,4 @@ path = "src/lib.rs"
 [dependencies]
 anyhow = "1.0.32"
 yaml-rust = "0.4.4"
+image = "0.23.9"

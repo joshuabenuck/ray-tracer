@@ -68,10 +68,28 @@ This implementation supports the majority of features described in the book. The
 - [x] Render [Groups Scene Description](https://forum.raytracerchallenge.com/thread/13/groups-scene-description)
 - [x] Render [Book Cover Scene Description](scenes/cover.yaml)
 
+## Optimizations
+
+- [ ] [Cache Matrix Inversions])(https://forum.raytracerchallenge.com/thread/180/reproducing-before-fresnel-after-picture)
+- [ ] Use AVX 256 or SIMD instructions?
+
+## Additions
+
+- [x] Export directly to png
+
 ## Possible Future Direction
 
+- [ ] Spotlights
+- [ ] Focal Blur
+- [ ] Motion Blur
+- [ ] Anti-aliasing
+- [ ] Normal Pertubation
+- [ ] [Torus Primitive](https://marcin-chwedczuk.github.io/ray-tracing-torus) - may need to use the [Durand-Kerner](https://en.wikipedia.org/wiki/Durand-Kerner_method) to solve quartic equations.
+- [ ] Volumetric Effects (smoke, fog, clouds, fire)
+- [ ] Radiosity
+- [ ] Photon Mapping
+- [ ] Parallelization
 - [ ] Compile to wasm
-- [ ] Export directly to png
 - [ ] Display renders line by line as they are computed
 - [ ] Clean up the mess that is the yaml scene renderer
 
@@ -84,3 +102,9 @@ Here's a summary of other implementations I've found on the web. Some of them ev
 * [fredrikln](https://github.com/fredrikln/the-raytracer-challenge) - I based my status checklist off of the readme in this project
 * [tomafro](https://github.com/tomafro/ray-tracer-challenge) - looks to support up to spheres and planes
 * [wtfleming](https://github.com/wtfleming/rust-ray-tracer) - this one has support for compiling to wasm
+
+## Other Ray Tracer Resources
+
+* [Ray Tracking in One Weekend - The Book Series](https://raytracing.github.io/)
+* [Realtime Rendering](http://www.realtimerendering.com/)
+* [Ray Tracing Gems](http://www.realtimerendering.com/raytracinggems/)

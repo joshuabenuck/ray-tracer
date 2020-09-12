@@ -312,8 +312,12 @@ fn main() -> Result<()> {
             let image = camera.render(&mut world);
             let path = std::path::PathBuf::from(path);
             let image_base = path.file_stem().unwrap().to_str().unwrap();
-            let image_path = format!("./{}.ppm", image_base);
-            std::fs::write(image_path, image.to_ppm())?;
+            let image_path = format!("./{}.png", image_base);
+            if image_path.contains("ppm") {
+                std::fs::write(image_path, image.to_ppm())?;
+            } else {
+                image.to_image().save(image_path)?;
+            }
         }
         None => {
             panic!("No camera set!");
