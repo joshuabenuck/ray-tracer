@@ -70,7 +70,7 @@ This implementation supports the majority of features described in the book. The
 
 ## Optimizations
 
-- [ ] [Cache Matrix Inversions])(https://forum.raytracerchallenge.com/thread/180/reproducing-before-fresnel-after-picture)
+- [ ] [Cache Matrix Inversions](https://forum.raytracerchallenge.com/thread/180/reproducing-before-fresnel-after-picture)
 - [ ] Use AVX 256 or SIMD instructions?
 
 ## Additions
@@ -102,6 +102,7 @@ Here's a summary of other implementations I've found on the web. Some of them ev
 * [fredrikln](https://github.com/fredrikln/the-raytracer-challenge) - I based my status checklist off of the readme in this project
 * [tomafro](https://github.com/tomafro/ray-tracer-challenge) - looks to support up to spheres and planes
 * [wtfleming](https://github.com/wtfleming/rust-ray-tracer) - this one has support for compiling to wasm
+* [txus](https://github.com/txus/rye)
 
 ## Other Ray Tracer Resources
 
