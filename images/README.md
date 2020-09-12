@@ -20,6 +20,7 @@ Shadow Puppets - This one initially didn't work. The YAML Scene Description pars
 Book Cover - This render required fixing several problems. The scene descriptions contained materials that inherited from one another. Once this was implemented, the lighting code needed to be updated. Support for multiple lights had only partially been implemented. Fixing both of those led to an improvement in the surface colors on the cubes, improvements in the shadows cast by one of the lights, and the left side of the cubes being more well lit.
 
 The remaining enigma is why the sphere is lighter than the one in the book.
+
 ![](032.png)
 
 Book Cover Take One - To render this version required adding a support for several more abstractions in the scene description parser. When it was first done, I didn't realize how far off the the original picture it was. Note the dark left side of the cubes and the faint second shadow of the sphere on the left side of the adjacent gray cube.
