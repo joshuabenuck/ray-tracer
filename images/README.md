@@ -24,6 +24,7 @@ The remaining enigma is why the sphere is lighter than the one in the book.
 ![](032.png)
 
 Book Cover Take One - To render this version required adding a support for several more abstractions in the scene description parser. When it was first done, I didn't realize how far off the the original picture it was. Note the dark left side of the cubes and the faint second shadow of the sphere on the left side of the adjacent gray cube.
+
 ![](029.png)
 
 Book Cover Take One - Smaller Render
