@@ -256,6 +256,12 @@ impl Matrix4x4 {
     }
 }
 
+impl Default for Matrix4x4 {
+    fn default() -> Matrix4x4 {
+        Matrix4x4::identity()
+    }
+}
+
 impl PartialEq for Matrix4x4 {
     fn eq(&self, other: &Matrix4x4) -> bool {
         let a = self;

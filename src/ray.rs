@@ -1,4 +1,4 @@
-use crate::{Color, Matrix4x4, Tuple};
+use crate::{pt, Color, Matrix4x4, Tuple};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Ray {
@@ -34,6 +34,15 @@ impl PointLight {
         PointLight {
             position,
             intensity,
+        }
+    }
+}
+
+impl Default for PointLight {
+    fn default() -> Self {
+        PointLight {
+            position: pt(0.0, 0.0, 0.0),
+            intensity: Color::new(1.0, 1.0, 1.0),
         }
     }
 }

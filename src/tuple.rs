@@ -213,6 +213,16 @@ impl Color {
     }
 }
 
+impl Default for Color {
+    fn default() -> Color {
+        Color {
+            red: 0.0,
+            green: 0.0,
+            blue: 0.0,
+        }
+    }
+}
+
 impl From<Color> for (usize, usize, usize) {
     fn from(color: Color) -> (usize, usize, usize) {
         let r = (color.red * 255.0).round() as isize;
