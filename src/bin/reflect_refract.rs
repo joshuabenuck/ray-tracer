@@ -87,15 +87,15 @@ fn main() -> Result<()> {
     let red = Sphere::new()
         .transform(id().translate(-0.6, 1.0, 0.6))
         .material(m().rgb(1.0, 0.3, 0.2).specular(0.4).shininess(5.0));
-    let teapot_contents = std::fs::read_to_string("./objs/teapot_smooth.obj")?;
-    let teapot = ObjParser::from_str(&teapot_contents)?
-        .into_group()
-        .transform(
-            id().rotate_x(-PI / 2.0)
-                .scale(0.07, 0.07, 0.07)
-                .translate(-0.6, 0.0, 0.6),
-        )
-        .shape();
+    // let teapot_contents = std::fs::read_to_string("./objs/teapot_smooth.obj")?;
+    // let teapot = ObjParser::from_str(&teapot_contents)?
+    //     .into_group()
+    //     .transform(
+    //         id().rotate_x(-PI / 2.0)
+    //             .scale(0.07, 0.07, 0.07)
+    //             .translate(-0.6, 0.0, 0.6),
+    //     )
+    //     .shape();
 
     let blue = Sphere::new()
         .transform(id().scale(0.7, 0.7, 0.7).translate(0.6, 0.7, -0.6))
@@ -135,11 +135,11 @@ fn main() -> Result<()> {
         sphere2.into(),
         sphere3.into(),
         sphere4.into(),
-        teapot.into(),
+        red.into(),
         blue.into(),
         green.into(),
     ];
     let image = camera.render(&mut world);
-    std::fs::write("./reflect_refract.ppm", image.to_ppm());
+    std::fs::write("./reflect_refract.ppm", image.to_ppm())?;
     Ok(())
 }
