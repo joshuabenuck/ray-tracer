@@ -3,18 +3,22 @@ use std::any::Any;
 use std::fmt::Debug;
 
 pub struct Props {
+    pub inverse: Matrix4x4,
     pub transform: Matrix4x4,
     pub material: Material,
     pub parent_transforms: Vec<Matrix4x4>,
+    pub parent_inverses: Vec<Matrix4x4>,
     pub shadow: bool,
 }
 
 impl Default for Props {
     fn default() -> Props {
         Props {
+            inverse: Matrix4x4::identity().inverse().unwrap(),
             transform: Matrix4x4::identity(),
             material: Material::new(),
             parent_transforms: Vec::new(),
+            parent_inverses: Vec::new(),
             shadow: true,
         }
     }
@@ -37,7 +41,7 @@ pub trait Shape {
     fn as_any_mut(&mut self) -> &mut dyn Any;
     fn shape_eq(&self, other: &dyn Any) -> bool;
     fn intersect(&'_ self, ray: &Ray) -> Vec<Intersection<'_>> {
-        let ray = ray.transform(self.transform().inverse().unwrap());
+        let ray = ray.transform(self.inverse());
         self.local_intersect(&ray)
     }
     fn local_intersect(&'_ self, ray: &Ray) -> Vec<Intersection<'_>>;
@@ -48,22 +52,22 @@ pub trait Shape {
     }
     fn world_to_object(&self, point: Tuple) -> Tuple {
         let mut point = point;
-        for transform in self.parent_transforms() {
-            point = transform.inverse().unwrap() * point;
+        for inverse in self.parent_inverses() {
+            point = *inverse * point;
         }
-        self.transform().inverse().unwrap() * point
+        self.inverse() * point
     }
     fn normal_to_world(&self, normal: Tuple) -> Tuple {
         let shape = self;
-        fn compute_normal(transform: &Matrix4x4, normal: Tuple) -> Tuple {
-            let mut normal = transform.inverse().unwrap().transpose() * normal;
+        fn compute_normal(inverse: &Matrix4x4, normal: Tuple) -> Tuple {
+            let mut normal = inverse.transpose() * normal;
             normal.w = 0.0;
             normal = normal.normalize();
             normal
         }
-        let mut normal = compute_normal(shape.transform(), normal);
-        for transform in self.parent_transforms().iter().rev() {
-            normal = compute_normal(transform, normal);
+        let mut normal = compute_normal(&shape.inverse(), normal);
+        for inverse in self.parent_inverses().iter().rev() {
+            normal = compute_normal(inverse, normal);
         }
 
         normal
@@ -71,14 +75,15 @@ pub trait Shape {
     fn local_normal_at(&self, local_point: Tuple, i: &Intersection) -> Tuple;
     fn common(&self) -> &Props;
     fn common_mut(&mut self) -> &mut Props;
+    fn inverse(&self) -> Matrix4x4 {
+        self.common().inverse
+    }
     fn transform(&self) -> &Matrix4x4 {
         &self.common().transform
     }
-    fn transform_mut(&mut self) -> &mut Matrix4x4 {
-        &mut self.common_mut().transform
-    }
     fn set_transform(&mut self, transform: Matrix4x4) {
         self.common_mut().transform = transform;
+        self.common_mut().inverse = transform.inverse().unwrap();
     }
     fn material(&self) -> &Material {
         &self.common().material
@@ -88,6 +93,12 @@ pub trait Shape {
     }
     fn set_material(&mut self, material: Material) {
         self.common_mut().material = material;
+    }
+    fn parent_inverses(&self) -> &Vec<Matrix4x4> {
+        &self.common().parent_inverses
+    }
+    fn set_parent_inverses(&mut self, parent_inverses: Vec<Matrix4x4>) {
+        self.common_mut().parent_inverses = parent_inverses;
     }
     fn parent_transforms(&self) -> &Vec<Matrix4x4> {
         &self.common().parent_transforms

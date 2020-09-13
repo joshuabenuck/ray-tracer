@@ -76,12 +76,15 @@ impl Shape for Group {
     fn refresh_parents(&mut self) {
         let material = self.common().material;
         let mut child_transforms = self.parent_transforms().clone();
+        let mut child_inverses = self.parent_inverses().clone();
         child_transforms.push(*Shape::transform(self));
+        child_inverses.push(Shape::inverse(self));
         for child in &mut self.children {
             if child.material() == &Material::new() {
                 child.set_material(material);
             }
             child.set_parent_transforms(child_transforms.clone());
+            child.set_parent_inverses(child_inverses.clone());
             if let Some(group) = child.as_any_mut().downcast_mut::<Group>() {
                 group.refresh_parents();
             }

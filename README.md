@@ -70,7 +70,7 @@ This implementation supports the majority of features described in the book. The
 
 ## Optimizations
 
-- [ ] [Cache Matrix Inversions](https://forum.raytracerchallenge.com/thread/180/reproducing-before-fresnel-after-picture)
+- [x] [Cache Matrix Inversions](https://forum.raytracerchallenge.com/thread/180/reproducing-before-fresnel-after-picture) - This sped up a 200x200 render of the cover from 19.5 seconds to 1.3 seconds!
 - [ ] Use AVX 256 or SIMD instructions?
 
 ## Additions
@@ -91,7 +91,6 @@ This implementation supports the majority of features described in the book. The
 - [ ] Parallelization
 - [ ] Compile to wasm
 - [ ] Display renders line by line as they are computed
-- [ ] Clean up the mess that is the yaml scene renderer
 
 ## Other Implementations
 
