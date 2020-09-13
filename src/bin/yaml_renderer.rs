@@ -20,7 +20,6 @@ impl Definitions {
 
     fn define(&mut self, obj: &Yaml) -> Result<()> {
         let name = obj["define"].as_str().expect("define is not a String");
-        println!("Defining {}", name);
         if name.contains("leg") || name.contains("cap") || name.contains("wacky") {
             let value = &obj["value"];
             self.shapes.insert(name.to_owned(), value.clone());
@@ -253,7 +252,6 @@ impl YamlExt for Yaml {
 
     fn as_shape(&self, defs: &Definitions) -> Result<Box<dyn Shape>> {
         let r#type = self["add"].as_str().expect("add parameter is not a String");
-        println!("Adding {}", r#type);
         let shape = match r#type {
             "cube" => {
                 let mut shape = Cube::new().shape();
@@ -377,9 +375,16 @@ impl YamlScene {
     }
 
     fn parse(&mut self) -> Result<()> {
+        let start = std::time::Instant::now();
+        let mut previous = "";
         for obj in self.yaml[0].as_vec().unwrap() {
             if let Yaml::String(r#type) = &obj["add"] {
-                println!("Adding {}", r#type);
+                if r#type == previous {
+                    print!(".");
+                } else {
+                    print!("\nAdding {}", r#type);
+                    previous = r#type;
+                }
                 match r#type.as_str() {
                     "camera" => {
                         self.camera = Some(obj.as_camera()?);
@@ -391,19 +396,23 @@ impl YamlScene {
                         self.world.objects.push(obj.as_shape(&self.definitions)?);
                     }
                 }
-            } else if let Yaml::String(_) = &obj["define"] {
+            } else if let Yaml::String(name) = &obj["define"] {
+                print!("\nDefining {}", name);
                 self.definitions.define(obj)?;
             } else {
                 panic!("Unexpected object type: {:?}", obj);
             }
         }
+        println!("\nParsed in: {:?}", start.elapsed());
         Ok(())
     }
 
     fn render(&mut self) -> Canvas {
+        let start = std::time::Instant::now();
         let camera = self.camera.as_ref().expect("no camera set");
         println!("Rendering");
         let image = camera.render(&mut self.world);
+        println!("Rendered in: {:?}", start.elapsed());
         image
     }
 
