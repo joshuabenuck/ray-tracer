@@ -1,6 +1,5 @@
 use anyhow::Result;
 use ray_tracer::*;
-use std::f64::consts::PI;
 
 fn main() -> Result<()> {
     let mut camera = Camera::new(400, 200, 1.152);
