@@ -8,6 +8,7 @@ mod scene;
 mod shape;
 mod shapes;
 mod tuple;
+mod yaml_scene;
 
 pub use intersection::{schlick, Comps, Intersection, Intersections};
 pub use material::{lighting, m, Material};
@@ -22,6 +23,7 @@ pub use scene::{view_transform, Camera, World};
 pub use shape::{Props, Shape};
 pub use shapes::{Cone, Csg, Cube, Cylinder, Group, Normal, Plane, Sphere, Triangle};
 pub use tuple::{black, pt, v, white, Canvas, Color, Tuple};
+pub use yaml_scene::YamlScene;
 
 pub const EPSILON: f64 = 0.00001;
 

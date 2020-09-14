@@ -1,3 +1,4 @@
+use anyhow::Result;
 use ray_tracer::*;
 use std::f64::consts::PI;
 
@@ -37,7 +38,7 @@ fn hexagon() -> Box<dyn Shape> {
     hex.shape()
 }
 
-fn main() -> Result<(), std::io::Error> {
+fn main() -> Result<()> {
     let light = PointLight::new(pt(10.0, 10.0, -10.0), Color::new(1.0, 1.0, 1.0));
     let mut camera = Camera::new(400, 200, PI / 2.0);
     camera.transform = view_transform(pt(0.0, 0.0, -5.0), pt(0.0, 0.0, 0.0), v(0.0, 1.0, 0.0));
@@ -50,6 +51,7 @@ fn main() -> Result<(), std::io::Error> {
     material.pattern = Some(stripe_pattern(black(), white()));
     hex.set_material(material);
     world.objects = vec![hex];
-    let image = camera.render(&mut world);
-    std::fs::write("./hexagon.ppm", image.to_ppm())
+    let image = camera.render(&mut world)?;
+    std::fs::write("./hexagon.ppm", image.to_ppm())?;
+    Ok(())
 }

@@ -138,7 +138,7 @@ fn main() -> Result<()> {
         blue.into(),
         green.into(),
     ];
-    let image = camera.render(&mut world);
+    let image = camera.render(&mut world)?;
     std::fs::write("./reflect_refract.ppm", image.to_ppm())?;
     Ok(())
 }

@@ -14,7 +14,7 @@ fn main() -> Result<()> {
         .into_group()
         .transform(Matrix4x4::rotation_x(-PI / 2.0))
         .shape()];
-    let image = camera.render(&mut world);
+    let image = camera.render(&mut world)?;
     std::fs::write("./teapot.ppm", image.to_ppm())?;
     Ok(())
 }

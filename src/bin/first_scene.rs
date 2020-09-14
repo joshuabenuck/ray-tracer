@@ -1,10 +1,11 @@
+use anyhow::Result;
 use ray_tracer::{
     gradient_pattern, pt, ring_pattern, stripe_pattern, v, view_transform, Camera, Color, Material,
     Matrix4x4, Plane, PointLight, Sphere, World,
 };
 use std::f64::consts::PI;
 
-fn main() -> Result<(), std::io::Error> {
+fn main() -> Result<()> {
     let mut material = Material::new();
     material.color = Color::new(1.0, 0.9, 0.9);
     let pattern = Some(gradient_pattern(
@@ -74,6 +75,7 @@ fn main() -> Result<(), std::io::Error> {
     let mut camera = Camera::new(400, 200, PI / 3.0);
     camera.transform = view_transform(pt(0.0, 1.5, -5.0), pt(0.0, 1.0, 0.0), v(0.0, 1.0, 0.0));
 
-    let canvas = camera.render(&mut world);
-    std::fs::write("./first_scene.ppm", canvas.to_ppm())
+    let canvas = camera.render(&mut world)?;
+    std::fs::write("./first_scene.ppm", canvas.to_ppm())?;
+    Ok(())
 }

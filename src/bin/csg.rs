@@ -1,7 +1,8 @@
+use anyhow::Result;
 use ray_tracer::*;
 use std::f64::consts::PI;
 
-fn main() -> Result<(), std::io::Error> {
+fn main() -> Result<()> {
     let mut camera = Camera::new(400, 200, 1.152);
     camera.transform = view_transform(pt(-2.6, 1.5, -3.9), pt(-0.6, 1.0, -0.8), v(0.0, 1.0, 0.0));
 
@@ -87,6 +88,7 @@ fn main() -> Result<(), std::io::Error> {
         csg.into(),
         holder.shape(),
     ];
-    let image = camera.render(&mut world);
-    std::fs::write("./csg.ppm", image.to_ppm())
+    let image = camera.render(&mut world)?;
+    std::fs::write("./csg.ppm", image.to_ppm())?;
+    Ok(())
 }

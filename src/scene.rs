@@ -2,6 +2,7 @@ use crate::{
     lighting, pt, schlick, Canvas, Color, Comps, Intersection, Intersections, Material, Matrix4x4,
     PointLight, Ray, Shape, Sphere, Tuple,
 };
+use anyhow::Result;
 
 pub struct World {
     pub objects: Vec<Box<dyn Shape>>,
@@ -168,6 +169,8 @@ pub fn view_transform(from: Tuple, to: Tuple, up: Tuple) -> Matrix4x4 {
     orientation * Matrix4x4::translation(-from.x, -from.y, -from.z)
 }
 
+use std::sync::mpsc::Sender;
+
 pub struct Camera {
     pub hsize: usize,
     pub vsize: usize,
@@ -176,6 +179,7 @@ pub struct Camera {
     pixel_size: f64,
     half_width: f64,
     half_height: f64,
+    pub tx: Option<Sender<(usize, usize, Color)>>,
 }
 
 impl Camera {
@@ -205,6 +209,7 @@ impl Camera {
             half_width,
             half_height,
             pixel_size,
+            tx: None,
         }
     }
 
@@ -233,18 +238,25 @@ impl Camera {
         Ray::new(origin, direction)
     }
 
-    pub fn render(&self, world: &mut World) -> Canvas {
+    pub fn render(&self, world: &mut World) -> Result<Canvas> {
         world.refresh_parents();
+        use rand::seq::SliceRandom;
         let mut image = Canvas::new(self.hsize, self.vsize);
+        let mut coords: Vec<usize> = (0..self.hsize * self.vsize).collect();
+        let mut rng = rand::thread_rng();
+        coords.shuffle(&mut rng);
 
-        for y in 0..self.vsize {
-            for x in 0..self.hsize {
-                let ray = self.ray_for_pixel(x, y);
-                let color = world.color_at(&ray, 4);
-                image.write_pixel(x, y, color);
+        for coord in coords.drain(..) {
+            let x = coord % self.hsize;
+            let y = coord / self.hsize;
+            let ray = self.ray_for_pixel(x, y);
+            let color = world.color_at(&ray, 4);
+            if let Some(tx) = &self.tx {
+                tx.send((x, y, color))?;
             }
+            image.write_pixel(x, y, color);
         }
-        image
+        Ok(image)
     }
 }
 
@@ -455,7 +467,7 @@ mod tests {
     }
 
     #[test]
-    fn camera_render() {
+    fn camera_render() -> Result<()> {
         // rendering a world with a camera
         let mut w = World::default();
         let mut c = Camera::new(11, 11, PI / 2.0);
@@ -463,8 +475,9 @@ mod tests {
         let to = pt(0.0, 0.0, 0.0);
         let up = v(0.0, 1.0, 0.0);
         c.transform = view_transform(from, to, up);
-        let image = c.render(&mut w);
+        let image = c.render(&mut w)?;
         assert_eq!(image.pixel_at(5, 5), Color::new(0.38066, 0.47583, 0.2855));
+        Ok(())
     }
 
     #[test]
